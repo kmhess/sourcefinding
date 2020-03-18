@@ -1,0 +1,13 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+modules/__pycache__
+.DS_Store
+
+# Random stuff
+.idea/
+
+# Data folders
+19*/
+20*/

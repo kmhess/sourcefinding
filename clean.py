@@ -1,6 +1,7 @@
 import logging
 import os
 
+from argparse import ArgumentParser, RawTextHelpFormatter
 import astropy.io.fits as pyfits
 import numpy as np
 
@@ -48,23 +49,51 @@ from apercal.libs import lib
 # Return final cubelets??
 
 
+###################################################################
+
+parser = ArgumentParser(description="Do source finding in the HI spectral line cubes for a given taskid, beam, cubes",
+                        formatter_class=RawTextHelpFormatter)
+
+parser.add_argument('-t', '--taskid', default='190915041',
+                    help='Specify the input taskid (default: %(default)s).')
+
+parser.add_argument('-b', '--beams', default='0-39',
+                    help='Specify a range (0-39) or list (3,5,7,11) of beams on which to do source finding (default: %(default)s).')
+
+parser.add_argument('-c', '--cubes', default='1,2,3',
+                    help='Specify the cubes on which to do source finding (default: %(default)s).')
+
+# Parse the arguments above
+args = parser.parse_args()
+
+# Parse the arguments above
+args = parser.parse_args()
+
 # Range of cubes/beams to work on:
-taskid = '190914041'
-cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
-beams = range(40)
+taskid = args.taskid
+cubes = [int(c) for c in args.cubes.split(',')]
+if '-' in args.beams:
+    b_range = args.beams.split('-')
+    beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
+else:
+    beams = [int(b) for b in args.beams.split(',')]
+
+# Parse the arguments above
+args = parser.parse_args()
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
 
 prepare = apercal.prepare()
-# subs_managefiles.director(self, 'ch', self.cleandir)
-subs_managefiles.director(prepare, 'ch', loc)
 
 # for cube_counter in range(len(self.line_cube_channelwidth_list)):
-for c in cubes:
-    for b in beams:
-        loc = '/tank/hess/apertif/' + taskid + '/B0' + str(beams).zfill(2) + '/'
+for b in beams:
+    loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
+    print(loc)
+    # subs_managefiles.director(self, 'ch', self.cleandir)
+    subs_managefiles.director(prepare, 'ch', loc)
 
+    for c in cubes:
         # cube_name = self.cleandir + '/cubes/' + self.line_image_cube_name + '{0}.fits'.format(cube_counter)
         line_cube = loc + cube_name + '{0}.fits'.format(c)
         # beam_cube_name = self.cleandir + '/cubes/' + self.line_image_beam_cube_name + '{0}.fits'.format(cube_counter)
@@ -72,6 +101,7 @@ for c in cubes:
         # mask_cube_name = self.cleandir + '/cubes/' + self.line_image_mask_cube_name+ '{0}.fits'.format(cube_counter)
         mask_cube = loc + cube_name + '{0}_4sig_mask.fits'.format(c)
         filter_cube = loc + cube_name + '{0}_filtered_sof1.fits'.format(c)
+        print(mask_cube)
 
         if os.path.isfile(mask_cube):
             print("[CLEAN] Determining the statistics of Cube {}, beam {:02}.".format(c, b))

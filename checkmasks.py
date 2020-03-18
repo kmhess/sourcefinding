@@ -1,6 +1,7 @@
 from glob import glob
 import os
 
+from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import ascii
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -14,10 +15,33 @@ def chan2freq(channels=None):
     frequencies = (channels * hdu_filter[0].header['CDELT3'] + hdu_filter[0].header['CRVAL3']) * u.Hz
     return frequencies
 
+###################################################################
 
-taskid = '190915041'
-beams = range(40)
-cubes = [1, 2, 3]
+parser = ArgumentParser(description="Make plots of sourcefinding.py results.",
+                        formatter_class=RawTextHelpFormatter)
+
+parser.add_argument('-t', '--taskid', default='190915041',
+                    help='Specify the input taskid (default: %(default)s).')
+
+parser.add_argument('-b', '--beams', default='0-39',
+                    help='Specify a range (0-39) or list (3,5,7,11) of beams on which to do source finding (default: %(default)s).')
+
+# Parse the arguments above
+args = parser.parse_args()
+
+# Range of cubes/beams to work on:
+taskid = args.taskid
+if '-' in args.beams:
+    b_range = args.beams.split('-')
+    beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
+else:
+    beams = [int(b) for b in args.beams.split(',')]
+#beams = args.beams  # range(40)
+
+cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
+
+# Parse the arguments above
+args = parser.parse_args()
 
 HI_restfreq = 1420405751.77 * u.Hz
 optical_HI = u.doppler_optical(HI_restfreq)
@@ -85,7 +109,7 @@ for b in beams:
             else:
                 print("NO sources in Beam {:02} Cube {}".format(b, c))
                 ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8)
-                ax_im[c - 1].set_title("Cube {}".format(c))
+                ax_im[c - 1].set_title("Beam {:02} Cube {}".format(b, c))
                 ax_im[c - 1].axis('off')
 
             hdu_filter.close()

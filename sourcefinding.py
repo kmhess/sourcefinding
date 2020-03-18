@@ -1,6 +1,7 @@
 import os
 import sys
 
+from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import fits
 from distutils.version import LooseVersion
 import math
@@ -15,11 +16,6 @@ elif LooseVersion(sp.__version__) < LooseVersion("0.15.0"):
 else:
     from scipy import nanmedian
 
-
-# Range of cubes/beams to work on:
-taskid = '190915041'
-cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
-beams = range(40)
 
 # For SoFiA-1 continuum filtering (do not edit)
 threshold = 4.0
@@ -173,6 +169,41 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     if cube == 3: os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
 
     return new_paramfile, outlog
+
+
+###################################################################
+
+parser = ArgumentParser(description="Do source finding in the HI spectral line cubes for a given taskid, beam, cubes",
+                        formatter_class=RawTextHelpFormatter)
+
+parser.add_argument('-t', '--taskid', default='190915041',
+                    help='Specify the input taskid (default: %(default)s).')
+
+parser.add_argument('-b', '--beams', default='0-39',
+                    help='Specify a range (0-39) or list (3,5,7,11) of beams on which to do source finding (default: %(default)s).')
+
+parser.add_argument('-c', '--cubes', default='1,2,3',
+                    help='Specify the cubes on which to do source finding (default: %(default)s).')
+
+# Parse the arguments above
+args = parser.parse_args()
+
+# Parse the arguments above
+args = parser.parse_args()
+
+# Range of cubes/beams to work on:
+taskid = args.taskid
+cubes = [int(c) for c in args.cubes.split(',')]
+#cubes = args.cubes  # [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
+if '-' in args.beams:
+    b_range = args.beams.split('-')
+    beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
+else:
+    beams = [int(b) for b in args.beams.split(',')]
+#beams = args.beams  # range(40)
+
+# Parse the arguments above
+args = parser.parse_args()
 
 
 # Main source finding code for all cubes/beams
