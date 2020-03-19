@@ -1,20 +1,8 @@
 import os
-import sys
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import fits
-from distutils.version import LooseVersion
-import math
 import numpy as np
-from scipy.ndimage.morphology import binary_dilation
-
-# Check numpy and scipy version numbers for the nanmedian function import
-if LooseVersion(np.__version__) >= LooseVersion("1.9.0"):
-    from numpy import nanmedian
-elif LooseVersion(sp.__version__) < LooseVersion("0.15.0"):
-    from scipy.stats import nanmedian
-else:
-    from scipy import nanmedian
 
 
 def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
@@ -26,12 +14,14 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     # Edit parameter file (remove lines that need editing)
     os.system('grep -vwE "(input.data)" ' + param_template + ' > ' + new_paramfile)
     os.system('grep -vwE "(output.filename)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
-    if cube == 3: os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
+    if cube == 3:
+        os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
 
     # Add back the parameters needed
     os.system('echo "input.data                 =  ' + filteredfits + '" >> ' + new_paramfile)
     os.system('echo "output.filename            =  ' + outroot + '" >> ' + new_paramfile)
-    if cube == 3: os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
+    if cube == 3:
+        os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
 
     return new_paramfile, outlog
 
@@ -53,9 +43,6 @@ parser.add_argument('-c', '--cubes', default='1,2,3',
 # Parse the arguments above
 args = parser.parse_args()
 
-# Parse the arguments above
-args = parser.parse_args()
-
 # Range of cubes/beams to work on:
 taskid = args.taskid
 cubes = [int(c) for c in args.cubes.split(',')]
@@ -64,10 +51,6 @@ if '-' in args.beams:
     beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
 else:
     beams = [int(b) for b in args.beams.split(',')]
-
-# Parse the arguments above
-args = parser.parse_args()
-
 
 # Main source finding code for all cubes/beams
 for b in beams:
@@ -119,5 +102,3 @@ for b in beams:
             sig = 4
             new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
             os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
-
-        # After source finding, reduce filtered cube to only one channel!  Need to work on expanding cube then in the first if/else.
