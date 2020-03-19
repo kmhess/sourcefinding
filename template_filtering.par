@@ -1,0 +1,142 @@
+### ____________________________________________________________________ ###
+###                                                                      ###
+### SoFiA 2.1.1 (default_parameters.par) - Source Finding Application    ###
+### Copyright (C) 2020 Tobias Westmeier                                  ###
+### ____________________________________________________________________ ###
+###                                                                      ###
+### Address:  Tobias Westmeier                                           ###
+###           ICRAR M468                                                 ###
+###           The University of Western Australia                        ###
+###           35 Stirling Highway                                        ###
+###           Crawley WA 6009                                            ###
+###           Australia                                                  ###
+###                                                                      ###
+### E-mail:   tobias.westmeier [at] uwa.edu.au                           ###
+### ____________________________________________________________________ ###
+###                                                                      ###
+### This program is free software: you can redistribute it and/or modify ###
+### it under the terms of the GNU General Public License as published by ###
+### the Free Software Foundation, either version 3 of the License, or    ###
+### (at your option) any later version.                                  ###
+###                                                                      ###
+### This program is distributed in the hope that it will be useful,      ###
+### but WITHOUT ANY WARRANTY; without even the implied warranty of       ###
+### MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the         ###
+### GNU General Public License for more details.                         ###
+###                                                                      ###
+### You should have received a copy of the GNU General Public License    ###
+### along with this program. If not, see http://www.gnu.org/licenses/.   ###
+### ____________________________________________________________________ ###
+###                                                                      ###
+
+
+# Default parameters for generating a continuum filtered cube in SoFiA-2
+# Please do not modify!
+
+
+# Global settings
+
+pipeline.verbose           =  false
+pipeline.pedantic          =  true
+
+
+# Input
+
+input.data                 =  /PATH/TASKID/BEAM/HI_image_cubeN.fits
+input.region               =  
+input.gain                 =  
+input.noise                =  
+input.weights              =  
+input.mask                 =  
+input.invert               =  false
+
+
+# Flagging
+
+flag.region                =  
+flag.auto                  =  pixels
+flag.threshold             =  5.0
+flag.log                   =  false
+
+
+# Noise scaling
+
+scaleNoise.enable          =  false
+scaleNoise.mode            =  spectral
+scaleNoise.windowXY        =  25
+scaleNoise.windowZ         =  15
+scaleNoise.gridXY          =  0
+scaleNoise.gridZ           =  0
+scaleNoise.interpolate     =  false
+scaleNoise.scfind          =  true
+
+
+# S+C finder
+
+scfind.enable              =  false
+scfind.kernelsXY           =  0, 3, 6
+scfind.kernelsZ            =  0, 3, 7
+scfind.threshold           =  4.0
+scfind.replacement         =  2.0
+scfind.statistic           =  mad
+scfind.fluxRange           =  negative
+
+
+# Threshold finder
+
+threshold.enable           =  false
+threshold.threshold        =  5.0
+threshold.mode             =  relative
+threshold.statistic        =  mad
+threshold.fluxRange        =  negative
+
+
+# Linker
+
+linker.radiusXY            =  1
+linker.radiusZ             =  2
+linker.minSizeXY           =  5
+linker.minSizeZ            =  5
+linker.maxSizeXY           =  0
+linker.maxSizeZ            =  0
+linker.keepNegative        =  false
+
+
+# Reliability
+
+reliability.enable         =  false
+reliability.threshold      =  0.9
+reliability.scaleKernel    =  0.5
+reliability.fmin           =  20.0
+reliability.plot           =  true
+
+
+# Parameterisation
+
+parameter.enable           =  false
+parameter.wcs              =  true
+parameter.physical         =  false
+parameter.prefix           =  SoFiA
+parameter.positionOffset   =  false
+
+
+# Output
+
+output.directory           =  
+output.filename            =  
+output.writeCatASCII       =  true
+output.writeCatXML         =  true
+output.writeCatSQL         =  false
+output.writeNoise          =  true
+output.writeFiltered       =  true
+output.writeMask           =  true
+output.writeMask2d         =  true
+output.writeRawMask        =  false
+output.writeMoments        =  true
+output.writeCubelets       =  false
+output.marginCubelets      =  0
+output.overwrite           =  true
+
+
+# Updated parameters
+
