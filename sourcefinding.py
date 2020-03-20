@@ -85,7 +85,7 @@ for b in beams:
                 dynamic_range = nanmax / nanstd
                 print("\tPsuedo dynamic range, max, std are: {}, {}, {}".format(dynamic_range, nanmax, nanstd))
         else:
-            print("\tBeam {:02} Cube {} is not present in this directory.")
+            print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
         # After filtering, if the DR (presumably from a bright HI source) is > 14 Do an initial source finding at sn=10.
