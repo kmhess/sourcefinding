@@ -4,15 +4,13 @@ import os
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import ascii
 from astropy.io import fits
-from astropy.wcs import WCS
-import numpy as np
-import matplotlib.pyplot as plt
 from astropy import units as u
-# %matplotlib
+from astropy.wcs import WCS
+import matplotlib.pyplot as plt
+import numpy as np
 
-
-def chan2freq(channels=None):
-    frequencies = (channels * hdu_filter[0].header['CDELT3'] + hdu_filter[0].header['CRVAL3']) * u.Hz
+def chan2freq(channels=None, hdu=None):
+    frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
     return frequencies
 
 ###################################################################
@@ -81,7 +79,7 @@ for b in beams:
                 mask2d=np.asfarray(mask2d)
                 mask2d[mask2d<1] = np.nan
 
-                cube_frequencies = chan2freq(np.array(range(hdu_filter[0].data.shape[0])))
+                cube_frequencies = chan2freq(np.array(range(hdu_filter[0].data.shape[0])), hdu=hdu_filter)
                 optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
 
                 ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8)
@@ -92,8 +90,8 @@ for b in beams:
                              cat['col2'][s], color='black')
                     # print(cat['col2'][s], wcs.pixel_to_world(cat['col3'][s], cat['col4'][s]).to_string('hmsdms'))
                     spectrum = np.sum(hdu_filter[0].data[:,mask2d==cat['col2'][s]],axis=1)
-                    maskmin = chan2freq(cat['col10'][s]).to(u.km/u.s, equivalencies=optical_HI).value
-                    maskmax = chan2freq(cat['col11'][s]).to(u.km/u.s, equivalencies=optical_HI).value
+                    maskmin = chan2freq(cat['col10'][s], hdu=hdu_filter).to(u.km/u.s, equivalencies=optical_HI).value
+                    maskmax = chan2freq(cat['col11'][s], hdu=hdu_filter).to(u.km/u.s, equivalencies=optical_HI).value
                     ax_spec[previous + s, 0].plot([optical_velocity[-1].value,optical_velocity[0].value], [0, 0], '--', color='gray')
                     ax_spec[previous + s, 0].plot(optical_velocity, spectrum, c=colors[c-1])
                     ax_spec[previous + s, 0].plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
