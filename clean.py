@@ -179,4 +179,7 @@ for b in beams:
             fits.out = line_cube[:-5] + '_model.fits'
             fits.go()
 
+            # Clean up extra Miriad files
+            os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+
 print("[CLEAN] Done.")
