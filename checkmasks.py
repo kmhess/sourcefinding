@@ -51,6 +51,8 @@ for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     source_per_beam = 0
     results = glob(loc + '*4sig_mask-2d.fits')
+    # Output where the program is looking exactly
+    print(loc)
 
     if len(results) > 0:
         header = fits.getheader(results[0])

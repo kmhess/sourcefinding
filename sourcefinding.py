@@ -63,6 +63,8 @@ for b in beams:
 
         sourcefits = loc + cube_name + '.fits'
         filteredfits = loc + cube_name + '_filtered.fits'
+        # Output exactly where sourcefinding is starting
+        print(sourcefits)
 
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
         if os.path.isfile(filteredfits):
