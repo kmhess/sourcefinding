@@ -67,7 +67,7 @@ for b in beams:
 
         previous = 0
         for c in cubes:
-            hdu_filter = fits.open(loc + cube_name + '{}_filtered_sof1.fits'.format(c))
+            hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
             filter2d = hdu_filter[0].data[0, :, :]
             filter2d[np.isnan(filter2d)] = 9.
             filter2d[filter2d < 9] = np.nan

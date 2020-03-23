@@ -99,7 +99,7 @@ for b in beams:
         # beam_cube_name = self.cleandir + '/cubes/' + self.line_image_beam_cube_name + '{0}.fits'.format(cube_counter)
         beam_cube = loc + beam_name + '{0}.fits'.format(c)
         # mask_cube_name = self.cleandir + '/cubes/' + self.line_image_mask_cube_name+ '{0}.fits'.format(cube_counter)
-        mask_cube = loc + cube_name + '{0}_4sig_dev_mask.fits'.format(c)
+        mask_cube = loc + cube_name + '{0}_4sig_mask.fits'.format(c)
         filter_cube = loc + cube_name + '{0}_filtered.fits'.format(c)
 
         if os.path.isfile(mask_cube):

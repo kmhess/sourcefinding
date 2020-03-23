@@ -9,7 +9,7 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     param_template = 'parameter_template_{}sig.par'.format(sig)
     new_paramfile = loc_dir + 'param_scTrel_{}sig.par'.format(sig)
     outlog = loc_dir + 'sourcefinding_{}sig.out'.format(sig)
-    outroot = cube_name + '_{}sig_dev'.format(sig)
+    outroot = cube_name + '_{}sig'.format(sig)
 
     # Edit parameter file (remove lines that need editing)
     os.system('grep -vwE "(input.data)" ' + param_template + ' > ' + new_paramfile)
@@ -102,7 +102,7 @@ for b in beams:
             new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
             os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
 
-        if (sig == 10) & (not os.path.isfile(loc + cube_name + '10sig_cat_dev.txt')):
+        if (sig == 10) & (not os.path.isfile(loc + cube_name + '10sig_cat.txt')):
             print("\t10 sigma found nothing. DOING 4 sigma SOURCE FINDING.")
             sig = 4
             new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
