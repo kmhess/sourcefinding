@@ -105,7 +105,7 @@ for b in beams:
         if os.path.isfile(mask_cube):
             # Output what exactly is being used to clean the data
             print(mask_cube)
-            print("[CLEAN] Determining the statistics of Cube {}, beam {:02}.".format(c, b))
+            print("[CLEAN] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
             image_data = pyfits.open(filter_cube)
             data = image_data[0].data
             lineimagestats = np.full(3, np.nan)

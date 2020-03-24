@@ -34,7 +34,6 @@ if '-' in args.beams:
     beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
 else:
     beams = [int(b) for b in args.beams.split(',')]
-#beams = args.beams  # range(40)
 
 cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
 
@@ -84,9 +83,11 @@ for b in beams:
                 cube_frequencies = chan2freq(np.array(range(hdu_filter[0].data.shape[0])), hdu=hdu_filter)
                 optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
 
-                ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8)
-                ax_im[c-1].imshow(mask2d, cmap='gist_rainbow')
-                ax_im[c-1].set_title("Cube {}".format(c))
+                ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
+                ax_im[c-1].imshow(mask2d, cmap='gist_rainbow', origin='lower')
+                ax_im[c-1].set_title("Beam {:02} Cube {}".format(b, c))
+                ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
+                ra.set_format_unit(u.hour)
                 for s in range(len(cat)):
                     ax_im[c-1].text(cat['col3'][s] + np.random.uniform(-40, 40), cat['col4'][s] + np.random.uniform(-40, 40),
                                     cat['col2'][s], color='black')
@@ -111,6 +112,8 @@ for b in beams:
                 print("NO sources in Beam {:02} Cube {}".format(b, c))
                 ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8)
                 ax_im[c - 1].set_title("Beam {:02} Cube {}".format(b, c))
+                ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
+                ra.set_format_unit(u.hour)
                 ax_im[c - 1].axis('off')
 
             hdu_filter.close()
