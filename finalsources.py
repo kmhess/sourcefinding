@@ -58,6 +58,10 @@ for b in beams:
             writemoment2.writeMoments(hdu_clean[0].data, hdu_mask3d[0].data, loc+cube_name+'{}_clean'.format(c),
                                       False, hdu_clean[0].header, False, True, True, True)
 
+            bmaj = hdu_clean[0].header['BMAJ'] * 3600. * u.arcsec
+            bmin = hdu_clean[0].header['BMIN'] * 3600. * u.arcsec
+            cellsize = hdu_clean[0].header['CDELT2'] * 3600. * u.arcsec
+
             # Make HI profiles:  **** NEED TO IMPROVE THIS BY STARTING WITH 3D MASK?!! *****
             hdu_mask2d = fits.open(loc + cube_name + '{}_4sig_mask-2d.fits'.format(c))
             mask2d = hdu_mask2d[0].data[:, :]
@@ -69,7 +73,14 @@ for b in beams:
 
             for s in range(len(cat)):
                 spectrum = np.sum(hdu_clean[0].data[:, mask2d == cat['col2'][s]], axis=1)
-                ascii.write([cube_frequencies, spectrum], loc + 'HI_image_cube{}_clean_source{}.txt'.format(c, s))
+                ascii.write([cube_frequencies, spectrum], loc + 'HI_image_cube{}_clean_source{}.txt'.format(c, s),
+                            names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+                os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin, cellsize))
+                os.system('cat temp ' + loc + 'HI_image_cube{}_clean_source{}.txt'.format(c, s) +
+                          ' > temp2 && mv temp2 ' + loc + 'HI_image_cube{}_clean_source{}.txt'.format(c, s))
+                os.system('rm temp')
 
         else:
             print("No CLEAN cube for Beam {:02}, Cube {}".format(b, c))
+
+print("Beam information can be read from the text files like: a.meta['comments'][0].replace('= ','').split()")
