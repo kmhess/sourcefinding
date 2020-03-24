@@ -48,10 +48,9 @@ Output:
 `HI_image_cube*_clean.fits` cleaned cube  
 `HI_image_cube*_model.fits` model cube  
 `HI_image_cube*_residual.fits` residual cube  
-And a bunch of Miriad files that aren't cleaned up at the moment.  
 
 ### Step 4: finalsources.py
 ```
 python finalsources.py -t <taskid> -b <beams> -c <cubes>
 ```
-Same defaults as above.  Create moment maps based on the existing SoFiA masks & cleaned cubes.  Moment maps are of the whole cube at the moment.  Also produce ascii text files for the HI profiles of each source.
+Same defaults as above.  Create moment maps based on the existing SoFiA masks & cleaned cubes.  Moment maps are of the whole cube at the moment.  Also produce ascii text files for the HI profiles of each source.  Clean beam data is stored in the comments of the text file.  It can be accessed, for example, with `a.meta['comments'][0].replace('= ','').split()`
