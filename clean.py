@@ -106,18 +106,11 @@ for b in beams:
             # Output what exactly is being used to clean the data
             print(mask_cube)
             print("[CLEAN] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
-            image_data = pyfits.open(filter_cube)
-            data = image_data[0].data
-            lineimagestats = np.full(3, np.nan)
-            if data.shape[-3] == 2:
-                lineimagestats[0] = np.nanmin(data[0, 0, :, :])  # Get the maxmimum of the image
-                lineimagestats[1] = np.nanmax(data[0, 0, :, :])  # Get the minimum of the image
-                lineimagestats[2] = np.nanstd(data[0, 0, :, :])  # Get the standard deviation
-            else:
-                lineimagestats[0] = np.nanmin(data)  # Get the maxmimum of the image
-                lineimagestats[1] = np.nanmax(data)  # Get the minimum of the image
-                lineimagestats[2] = np.nanstd(data)  # Get the standard deviation
-            image_data.close()
+            f = pyfits.open(filter_cube)
+            mask = np.ones(f[0].data.shape[0], dtype=bool)
+            if c == 3: mask[376:662] = False
+            lineimagestats = [np.nanmin(f[0].data[mask]), np.nanmax(f[0].data[mask]), np.nanstd(f[0].data[mask])]
+            f.close()
             print("[CLEAN] Image min, max, std: ", lineimagestats[:])
 
             fits = lib.miriad('fits')

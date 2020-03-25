@@ -55,7 +55,7 @@ input.invert               =  false
 
 flag.region                =  
 flag.auto                  =  pixels
-flag.threshold             =  5.0
+flag.threshold             =  4.5
 flag.log                   =  false
 flag.radiusSpatial         =  0
 

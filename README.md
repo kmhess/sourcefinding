@@ -4,7 +4,7 @@ Various programs/tools for source finding and cleaning of Apertif HI cubes
 
 ### Step 1: sourcefinding.py
 ```
-python sourcefinding.py -t <taskid> -b <beams> -c <cubes>
+python sourcefinding.py -t <taskid> -b <beams> -c <cubes> -o <optionally overwrites continuum filtered file>
 ```
 Default for beams is 0-39 (all).  
 Default for cubes is 1,2,3 (nearest cubes where we expect direct detections).

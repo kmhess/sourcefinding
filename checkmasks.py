@@ -110,7 +110,7 @@ for b in beams:
 
             else:
                 print("NO sources in Beam {:02} Cube {}".format(b, c))
-                ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8)
+                ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
                 ax_im[c - 1].set_title("Beam {:02} Cube {}".format(b, c))
                 ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
                 ra.set_format_unit(u.hour)
