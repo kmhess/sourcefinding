@@ -63,23 +63,38 @@ parser.add_argument('-b', '--beams', default='0-39',
 parser.add_argument('-c', '--cubes', default='1,2,3',
                     help='Specify the cubes on which to do source finding (default: %(default)s).')
 
-# Parse the arguments above
-args = parser.parse_args()
+parser.add_argument('-s', '--sources', default='all',
+                    help='Specify sources to clean.  Can specify range or list. (default: %(default)s).')
+
+parser.add_argument('-o', "--overwrite",
+                    help="If option is included, overwrite old clean, model, and residual FITS files.",
+                    action='store_true')
 
 # Parse the arguments above
 args = parser.parse_args()
+
+###################################################################
 
 # Range of cubes/beams to work on:
 taskid = args.taskid
 cubes = [int(c) for c in args.cubes.split(',')]
+
 if '-' in args.beams:
     b_range = args.beams.split('-')
     beams = np.array(range(int(b_range[1])-int(b_range[0])+1)) + int(b_range[0])
 else:
     beams = [int(b) for b in args.beams.split(',')]
 
-# Parse the arguments above
-args = parser.parse_args()
+if args.sources == 'all':
+    mask_expr = '"<mask_sofia>.ge.0.5"'
+elif '-' in args.sources:
+    mask_range = args.sources.split('-')
+    mask_expr = '"(<mask_sofia>.eq.0.5).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0], mask_range[1])
+else:
+    sources = [str(s) for s in args.sources.split(',')]
+    mask_expr = '"(<mask_sofia>.eq.0.5).or.(<mask_sofia>.eq.'+').or.(<mask_sofia>.eq.'.join(sources)+')"'
+
+overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
@@ -105,6 +120,13 @@ for b in beams:
         if os.path.isfile(mask_cube):
             # Output what exactly is being used to clean the data
             print(mask_cube)
+            # Edit mask cube to trick Miriad into using the whole volume.
+            m = pyfits.open(mask_cube, mode='update')
+            m[0].data = np.asfarray(m[0].data)
+            m[0].data[0, 0, 0] = 0.5
+            m[0].data[-1, -1, -1] = 0.5
+            m.flush()
+
             print("[CLEAN] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
             f = pyfits.open(filter_cube)
             mask = np.ones(f[0].data.shape[0], dtype=bool)
@@ -112,6 +134,11 @@ for b in beams:
             lineimagestats = [np.nanmin(f[0].data[mask]), np.nanmax(f[0].data[mask]), np.nanstd(f[0].data[mask])]
             f.close()
             print("[CLEAN] Image min, max, std: ", lineimagestats[:])
+
+            if overwrite:
+                os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+
+            print("[CLEAN] Reading in FITS files, making Miriad mask.")
 
             fits = lib.miriad('fits')
             fits.op = 'xyin'
@@ -130,12 +157,12 @@ for b in beams:
             maths = lib.miriad('maths')
             maths.out = 'mask_00'
             maths.exp = '"<mask_sofia>"'
-            maths.mask = '"<mask_sofia>.eq.1"'
+            maths.mask = mask_expr
             maths.go()
 
             nminiter = 1
             for minc in range(nminiter):
-                print("[CLEAN] Cleaning HI emission using SoFiA mask.")
+                print("[CLEAN] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
                 clean = lib.miriad('clean')
                 clean.map = 'map_' + str(minc).zfill(2)
                 clean.beam = 'beam_' + str(minc).zfill(2)
@@ -157,6 +184,9 @@ for b in beams:
                 restor.mode = 'residual'  # Create the residual image
                 restor.out = 'residual_' + str(minc + 1).zfill(2)
                 restor.go()
+
+            if overwrite:
+                os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5], line_cube[:-5]))
 
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
             fits.op = 'xyout'
