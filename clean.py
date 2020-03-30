@@ -1,7 +1,9 @@
+import csv
 import logging
 import os
 
 from argparse import ArgumentParser, RawTextHelpFormatter
+from astropy.io import ascii
 import astropy.io.fits as pyfits
 import numpy as np
 
@@ -89,6 +91,7 @@ if args.sources == 'all':
     mask_expr = '"<mask_sofia>.ge.0.5"'
 elif '-' in args.sources:
     mask_range = args.sources.split('-')
+    sources = np.array(range(int(mask_range[1])-int(mask_range[0])+1)) + int(mask_range[0])
     mask_expr = '"(<mask_sofia>.eq.0.5).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0], mask_range[1])
 else:
     sources = [str(s) for s in args.sources.split(',')]
@@ -98,6 +101,8 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
+header = ['# taskid', 'beam', 'cube', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max',
+          'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag']
 
 prepare = apercal.prepare()
 
@@ -105,6 +110,8 @@ prepare = apercal.prepare()
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     print(loc)
+    clean_catalog = loc + 'clean_cat.txt'
+
     # subs_managefiles.director(self, 'ch', self.cleandir)
     subs_managefiles.director(prepare, 'ch', loc)
 
@@ -116,6 +123,7 @@ for b in beams:
         # mask_cube_name = self.cleandir + '/cubes/' + self.line_image_mask_cube_name+ '{0}.fits'.format(cube_counter)
         mask_cube = loc + cube_name + '{0}_4sig_mask.fits'.format(c)
         filter_cube = loc + cube_name + '{0}_filtered.fits'.format(c)
+        catalog_file = loc + cube_name + '{0}_4sig_cat.txt'.format(c)
 
         if os.path.isfile(mask_cube):
             # Output what exactly is being used to clean the data
@@ -202,7 +210,31 @@ for b in beams:
             fits.out = line_cube[:-5] + '_model.fits'
             fits.go()
 
+            # If everything was successful and didn't crash for a given beam/cube:
+            catalog = ascii.read(catalog_file, header_start=10)
+            catalog['taskid'] = taskid.replace('/','')
+            catalog['beam'] = b
+            catalog['cube'] = c
+            catalog_reorder = catalog['taskid', 'beam', 'cube', 'id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max',
+                                      'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag']
+            if args.sources == 'all':
+                sources = np.array(range(len(catalog))) + 1
+
+            if os.path.isfile(clean_catalog):
+                header = False
+            with open(clean_catalog, 'a') as csvfile:
+                print('[CLEAN] Appending cleaned sources to a file called \n\t{}'.format(clean_catalog))
+                writer = csv.writer(csvfile, delimiter='\t')
+                if header:
+                    writer.writerow(header)
+                for s in sources:
+                    writer.writerow(catalog_reorder[catalog_reorder['id'] == int(s)][0])
+
             # Clean up extra Miriad files
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+
+    # Will probably need to do some sorting if run clean multiple times.  This is a starting point:
+    # os.system('head -n +1 {} > temp'.format(clean_catalog))
+    # os.system('tail -n +2 {} | sort | uniq > temp2'.format(clean_catalog))
 
 print("[CLEAN] Done.")
