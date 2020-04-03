@@ -43,10 +43,10 @@ else:
 cube_name = 'HI_image_cube'
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
-    catalog = ascii.read(loc + 'clean_cat.txt')
 
     for c in cubes:
         if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)):
+            catalog = ascii.read(loc + 'clean_cat.txt')
             cat = catalog[catalog['cube'] == c]
             cathead = np.array(cat.colnames)
             print("Found {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
