@@ -78,11 +78,12 @@ for b in beams:
                 # Array math hopefully a lot faster on (spatially) tiny subcubes...???
                 subcube = hdu_clean[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
                           int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
-                submask = hdu_mask3d[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
-                          int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
+                submask = fits.getdata(outname + '_{}_mask.fits'.format(obj[0]))
+                # submask = hdu_mask3d[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
+                #           int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
 
-                mask_one = np.zeros(subcube.shape)
-                mask_one[submask == obj[0]] = 1
+                mask_one = np.zeros(submask.shape)
+                # mask_one[submask == obj[0]] = 1
                 # Can potentially save this as a better nchan if need be:
                 mask2d = np.sum(mask_one, axis=0)
                 spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
