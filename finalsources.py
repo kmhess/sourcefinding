@@ -75,11 +75,17 @@ for b in beams:
             # Make individual HI profiles over whole cube by squashing 3D mask:
             cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
             for obj in objects:
-                mask_one = np.zeros(hdu_mask3d[0].data.shape)
-                mask_one[hdu_mask3d[0].data == obj[0]] = 1
+                # Array math hopefully a lot faster on (spatially) tiny subcubes...???
+                subcube = hdu_clean[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
+                          int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
+                submask = hdu_mask3d[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
+                          int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
+
+                mask_one = np.zeros(subcube.shape)
+                mask_one[submask == obj[0]] = 1
                 # Can potentially save this as a better nchan if need be:
                 mask2d = np.sum(mask_one, axis=0)
-                spectrum = np.nansum(hdu_clean[0].data[:, mask2d != 0], axis=1)
+                spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
                 ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
                             names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
                 os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin, cellsize))
