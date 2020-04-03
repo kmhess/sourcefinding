@@ -100,20 +100,25 @@ for b in beams:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
-        # After filtering, if the DR (presumably from a bright HI source) is > 14 Do an initial source finding at sn=10.
-        if (c != 1) & (dynamic_range >= dynamic_range_limit):
-            print("\tNEED TO DO HIGH THRESHOLD (10 sigma) SOURCE FINDING FIRST.")
-            sig = 10
-            new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
-            os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
-        else:
-            print("\tDOING 4 sigma SOURCE FINDING.")
-            sig = 4
-            new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
-            os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
+        print("\tDOING 4 sigma SOURCE FINDING.")
+        sig = 4
+        new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
+        os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
 
-        if (sig == 10) & (not os.path.isfile(loc + cube_name + '10sig_cat.txt')):
-            print("\t10 sigma found nothing. DOING 4 sigma SOURCE FINDING.")
-            sig = 4
-            new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
-            os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
+        # After filtering, if the DR (presumably from a bright HI source) is > 14 Do an initial source finding at sn=10.
+        # if (c != 1) & (dynamic_range >= dynamic_range_limit):
+        #     print("\tNEED TO DO HIGH THRESHOLD (10 sigma) SOURCE FINDING FIRST.")
+        #     sig = 10
+        #     new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
+        #     os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
+        # else:
+        #     print("\tDOING 4 sigma SOURCE FINDING.")
+        #     sig = 4
+        #     new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
+        #     os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
+        #
+        # if (sig == 10) & (not os.path.isfile(loc + cube_name + '10sig_cat.txt')):
+        #     print("\t10 sigma found nothing. DOING 4 sigma SOURCE FINDING.")
+        #     sig = 4
+        #     new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
+        #     os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
