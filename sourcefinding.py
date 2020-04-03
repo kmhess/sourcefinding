@@ -74,7 +74,7 @@ for b in beams:
         print(sourcefits)
 
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
-        if not overwrite & os.path.isfile(filteredfits):
+        if (not overwrite) & os.path.isfile(filteredfits):
             print("\tContinuum filtered file exists and will not be overwritten.")
             with fits.open(filteredfits, mode='update') as f:
                 # mask = np.ones(f[0].data.shape[0], dtype=bool)  # Commented out because doesn't seem to affect DR when using filtered cube.
