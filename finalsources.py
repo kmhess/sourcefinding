@@ -75,17 +75,33 @@ for b in beams:
             # Make individual HI profiles over whole cube by squashing 3D mask:
             cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
             for obj in objects:
-                # Array math hopefully a lot faster on (spatially) tiny subcubes...???
-                subcube = hdu_clean[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
-                          int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
-                submask = fits.getdata(outname + '_{}_mask.fits'.format(obj[0]))
-                # submask = hdu_mask3d[0].data[:, int(obj[cathead == 'y_min'][0]):int(obj[cathead == 'y_max'][0] + 1),
-                #           int(obj[cathead == 'x_min'][0]):int(obj[cathead == 'x_max'][0] + 1)]
+                # Some lines stolen from cubelets in  SoFiA:
+                cubeDim = hdu_clean[0].data.shape
+                Xc = obj[cathead == "x"][0]
+                Yc = obj[cathead == "y"][0]
+                Xmin = obj[cathead == "x_min"][0]
+                Ymin = obj[cathead == "y_min"][0]
+                Xmax = obj[cathead == "x_max"][0]
+                Ymax = obj[cathead == "y_max"][0]
+                cPixXNew = int(Xc)
+                cPixYNew = int(Yc)
+                maxX = 2 * max(abs(cPixXNew - Xmin), abs(cPixXNew - Xmax))
+                maxY = 2 * max(abs(cPixYNew - Ymin), abs(cPixYNew - Ymax))
+                XminNew = cPixXNew - maxX
+                if XminNew < 0: XminNew = 0
+                YminNew = cPixYNew - maxY
+                if YminNew < 0: YminNew = 0
+                XmaxNew = cPixXNew + maxX
+                if XmaxNew > cubeDim[2] - 1: XmaxNew = cubeDim[2] - 1
+                YmaxNew = cPixYNew + maxY
+                if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
-                mask_one = np.zeros(submask.shape)
-                # mask_one[submask == obj[0]] = 1
-                # Can potentially save this as a better nchan if need be:
-                mask2d = np.sum(mask_one, axis=0)
+                # Array math hopefully a lot faster on (spatially) tiny subcubes...???
+                subcube = hdu_clean[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+                submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
+
+                # Can potentially save this as a better nchan if need be because mask values are 0 or 1:
+                mask2d = np.sum(submask, axis=0)
                 spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
                 ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
                             names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
