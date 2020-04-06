@@ -101,8 +101,8 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
-header = ['# id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max',
-          'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+header = ['# id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix', 'f_min', 'f_max',
+          'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
 
 prepare = apercal.prepare()
 
@@ -216,8 +216,8 @@ for b in beams:
             catalog['taskid'] = taskid.replace('/','')
             catalog['beam'] = b
             catalog['cube'] = c
-            catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max',
-                                      'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+            catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
+                                      'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
 
             if args.sources == 'all':
                 sources = np.array(range(len(catalog))) + 1
@@ -235,7 +235,7 @@ for b in beams:
             # Clean up extra Miriad files
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
 
-    # Will probably need to do some sorting if run clean multiple times.  This is a starting point:
+    # Will probably need to do some sorting of the catalog if run clean multiple times.  This is a starting point:
     # os.system('head -n +1 {} > temp'.format(clean_catalog))
     # os.system('tail -n +2 {} | sort | uniq > temp2'.format(clean_catalog))
 
