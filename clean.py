@@ -7,7 +7,7 @@ from astropy.io import ascii
 import astropy.io.fits as pyfits
 import numpy as np
 
-# logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 import apercal
 from apercal.modules.base import BaseModule
@@ -101,8 +101,8 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
-header = ['# taskid', 'beam', 'cube', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max',
-          'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag']
+header = ['# id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max',
+          'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
 
 prepare = apercal.prepare()
 
@@ -130,9 +130,9 @@ for b in beams:
             print(mask_cube)
             # Edit mask cube to trick Miriad into using the whole volume.
             m = pyfits.open(mask_cube, mode='update')
-            m[0].data = np.asfarray(m[0].data)
-            m[0].data[0, 0, 0] = 0.5
-            m[0].data[-1, -1, -1] = 0.5
+            m[0].data[0, 0, 0] = -1
+            m[0].data[-1, -1, -1] = -1
+            m[0].scale('int16')
             m.flush()
 
             print("[CLEAN] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
@@ -195,6 +195,7 @@ for b in beams:
 
             if overwrite:
                 os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5], line_cube[:-5]))
+                print("WARNING...overwrite won't delete clean_cat.txt file.  Manage this carefully!")
 
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
             fits.op = 'xyout'
@@ -215,8 +216,9 @@ for b in beams:
             catalog['taskid'] = taskid.replace('/','')
             catalog['beam'] = b
             catalog['cube'] = c
-            catalog_reorder = catalog['taskid', 'beam', 'cube', 'id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max',
-                                      'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag']
+            catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max',
+                                      'z_min', 'z_max', 'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+
             if args.sources == 'all':
                 sources = np.array(range(len(catalog))) + 1
 
