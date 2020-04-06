@@ -1,4 +1,3 @@
-import csv
 import logging
 import os
 
@@ -15,6 +14,8 @@ from apercal.subs import setinit as subs_setinit
 from apercal.subs import managefiles as subs_managefiles
 from apercal.subs import imstats as subs_imstats
 from apercal.libs import lib
+
+from modules.functions import write_catalog
 
 
 # class clean(BaseModule):
@@ -101,10 +102,10 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
-header = ['# id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix', 'f_min', 'f_max',
+header = ['id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix', 'f_min', 'f_max',
           'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
 
-prepare = apercal.prepare()
+# prepare = apercal.prepare()
 
 # for cube_counter in range(len(self.line_cube_channelwidth_list)):
 for b in beams:
@@ -113,7 +114,7 @@ for b in beams:
     clean_catalog = loc + 'clean_cat.txt'
 
     # subs_managefiles.director(self, 'ch', self.cleandir)
-    subs_managefiles.director(prepare, 'ch', loc)
+    # subs_managefiles.director(prepare, 'ch', loc)
 
     for c in cubes:
         # cube_name = self.cleandir + '/cubes/' + self.line_image_cube_name + '{0}.fits'.format(cube_counter)
@@ -213,24 +214,25 @@ for b in beams:
 
             # If everything was successful and didn't crash for a given beam/cube:
             catalog = ascii.read(catalog_file, header_start=10)
-            catalog['taskid'] = taskid.replace('/','')
+            catalog['taskid'] = np.int(taskid.replace('/',''))
             catalog['beam'] = b
             catalog['cube'] = c
             catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
                                       'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+            catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
+                           "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube")
+            catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-", "JY/BEAM",
+                           "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-")
+            catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+                           "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i")
+            objects = []
+            for source in catalog_reorder:
+                obj = []
+                for s in source:
+                    obj.append(s)
+                objects.append(obj)
 
-            if args.sources == 'all':
-                sources = np.array(range(len(catalog))) + 1
-
-            if os.path.isfile(clean_catalog):
-                header = False
-            with open(clean_catalog, 'a') as csvfile:
-                print('[CLEAN] Appending cleaned sources to a file called \n\t{}'.format(clean_catalog))
-                writer = csv.writer(csvfile, delimiter='\t')
-                if header:
-                    writer.writerow(header)
-                for s in sources:
-                    writer.writerow(catalog_reorder[catalog_reorder['id'] == int(s)][0])
+            write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'test.txt')
 
             # Clean up extra Miriad files
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
