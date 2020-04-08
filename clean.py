@@ -105,6 +105,13 @@ beam_name = 'HI_beam_cube'
 header = ['id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix', 'f_min', 'f_max',
           'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
 
+catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
+               "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube")
+catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-", "JY/BEAM",
+               "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-")
+catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+               "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i")
+
 # prepare = apercal.prepare()
 
 # for cube_counter in range(len(self.line_cube_channelwidth_list)):
@@ -219,12 +226,6 @@ for b in beams:
             catalog['cube'] = c
             catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
                                       'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
-            catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
-                           "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube")
-            catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-", "JY/BEAM",
-                           "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-")
-            catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
-                           "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i")
             objects = []
             for source in catalog_reorder:
                 obj = []
