@@ -233,7 +233,7 @@ for b in beams:
                     obj.append(s)
                 objects.append(obj)
 
-            write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'test.txt')
+            write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
 
             # Clean up extra Miriad files
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')

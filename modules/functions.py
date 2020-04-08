@@ -22,7 +22,8 @@ def pbcor(image_name, cb_name, hdu_image, beam, cube):
     """
 
     # Make regridded CB FITS file if it doesn't already exist:
-    if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])):
+    if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])) | \
+           os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
         regrid_in_miriad(image_name, cb_name, hdu_image, beam, cube)
 
     if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
@@ -49,7 +50,7 @@ def write_catalog(objects, catHeader, catUnits, catFormat, parList, outName):
     headerCol = ""
     outFormat = ""
     colCount = 0
-    header = "Apertif catalogue written {}.\n" % Time.now()
+    header = "Apertif catalogue written {} UTC.\n".format(Time.now())
 
     for par in parList:
         index = list(catHeader).index(par)
