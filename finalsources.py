@@ -17,6 +17,7 @@ sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
 
 from modules.functions import pbcor
+from modules.functions import write_catalog
 
 def chan2freq(channels=None, hdu=None):
     frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
@@ -54,6 +55,20 @@ optical_HI = u.doppler_optical(HI_restfreq)
 H0 = 70.
 
 cube_name = 'HI_image_cube'
+header = ['id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
+          'logMhi', 'SJyHz', 'redshift', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
+          'flag', 'taskid', 'beam', 'cube']
+
+catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
+               "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube",
+               "SJyHz", "logMhi", "redshift", "v_sys", "D_Lum", "rms_spec", "SNR")
+catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan",
+               "-", "JY/BEAM", "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-",
+               "JY*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "JY/CHAN", "-")
+catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i",
+               "%8i", "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i",
+               "%13.6f", "%12.6f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f")
+
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     if os.path.isfile(loc + 'clean_cat.txt'):
@@ -99,7 +114,7 @@ for b in beams:
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
-                signal, Mhi, z, v_sys, DL_Mpc, rms_spec, SNR = [], [], [], [], [], [], []
+                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR = [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -133,17 +148,19 @@ for b in beams:
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
-                    freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
-                    v_sys = freq_sys.to(u.km/u.s, equivalencies=optical_HI)
-                    z = HI_restfreq / freq_sys - 1.
-                    cosmo = cosmocalc(z, H0)
                     signal = np.nansum(spectrum[int(Zmin):int(Zmax)])
-                    Mhi = 49.7 * signal * chan_width * cosmo['DL_Mpc']**2 / pix_per_beam
+                    SJyHz.append(signal * chan_width / pix_per_beam)
+                    freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
+                    v_sys.append(freq_sys.to(u.km/u.s, equivalencies=optical_HI).value)
+                    redshift.append(HI_restfreq / freq_sys - 1.)
+                    cosmo = cosmocalc(redshift[-1], H0)
+                    D_Lum.append(cosmo['DL_Mpc'])
+                    Mhi = 49.7 * SJyHz[-1] * cosmo['DL_Mpc']**2
+                    logMhi.append(np.log10(Mhi))
                     specmask = np.zeros(len(spectrum))
                     specmask[int(Zmin):int(Zmax)] = 1
-                    rms_spec = np.std(spectrum[specmask == 0])
-                    SNR = signal / (rms_spec * np.sqrt(Zmax - Zmin))
-                    print("MHI: {:4.2e}, v_sys: {:7.2f}, rms_spec: {}, SNR: {}".format(Mhi, v_sys, rms_spec, SNR))
+                    rms_spec.append(np.std(spectrum[specmask == 0]))
+                    SNR.append(signal / (rms_spec[-1] * np.sqrt(Zmax - Zmin)))
 
                     # Save spectrum to a txt file:
                     ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
@@ -194,6 +211,26 @@ for b in beams:
 
                         fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
                         hdulist_hi.close()
+
+                # Add derived parameters to objects to then be written to catalog:
+                cat['SJyHz'] = SJyHz
+                cat['logMhi'] = logMhi
+                cat['redshift'] = redshift
+                cat['v_sys'] = v_sys
+                cat['D_Lum'] = D_Lum
+                cat['rms_spec'] = rms_spec
+                cat['SNR'] = SNR
+
+                objects = []
+                for source in cat:
+                    obj = []
+                    for s in source:
+                        obj.append(s)
+                    objects.append(obj)
+                objects = np.array(objects)
+
+                # Write out new catalog on a per cube basis:
+                write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'final_cat.txt')
 
                 hdu_clean.close()
                 hdu_mask3d.close()
