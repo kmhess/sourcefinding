@@ -16,6 +16,8 @@ from reproject import reproject_interp
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
 
+from modules.functions import pbcor
+
 def chan2freq(channels=None, hdu=None):
     frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
     return frequencies
@@ -67,8 +69,11 @@ for b in beams:
                 # Read in the cleaned data and original SoFiA mask:
                 hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
-                # hdu_pb = fits.open( )
-                outname = 'src_taskid{}_beam{:02}_cube{}'.format(taskid, b, c)
+
+                hdu_pb = pbcor(loc + cube_name + '{}_clean.fits'.format(c),
+                               loc + cube_name + '{}_cb-2d.fits'.format(c), hdu_clean, b, c)
+
+                outname = 'src_taskid{}_beam{:02}_cube{}new'.format(taskid, b, c)
                 wcs = WCS(hdu_clean[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
@@ -79,7 +84,7 @@ for b in beams:
                         obj.append(s)
                     objects.append(obj)
                 objects = np.array(objects)
-                cubelets.writeSubcube(hdu_clean[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
+                cubelets.writeSubcube(hdu_pb[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
                                       outname, loc, False, False)
 
                 # Get beam size and cell size
@@ -94,6 +99,7 @@ for b in beams:
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
+                signal, Mhi, z, v_sys, DL_Mpc, rms_spec, SNR = [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -120,16 +126,13 @@ for b in beams:
                     if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
                     # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
-                    subcube = hdu_clean[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+                    subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
                     submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
-                    # subpb = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
-                    # pbcor_subcube = subcube * subpb
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
-                    # spectrum = np.nansum(pbcor_subcube[:, mask2d != 0], axis=1)
                     freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
                     v_sys = freq_sys.to(u.km/u.s, equivalencies=optical_HI)
                     z = HI_restfreq / freq_sys - 1.
@@ -145,9 +148,10 @@ for b in beams:
                     # Save spectrum to a txt file:
                     ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
                                 names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
-                    os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin, hi_cellsize))
-                    os.system('cat temp ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])) + ' > temp2 && mv temp2 '
-                              + loc + outname + '_{}_specfull.txt'.format(int(obj[0])))
+                    os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                                   hi_cellsize))
+                    os.system('cat temp ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])) +
+                              ' > temp2 && mv temp2 ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])))
                     os.system('rm temp')
 
                     # Get optical image
@@ -169,9 +173,9 @@ for b in beams:
                         rms = np.std(subcube) * chan_width
                         nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
                         print("NHI is {}e+19".format(nhi19))
-                        nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}e+19".format(nhi19 * 3, nhi19 * 5,
-                                                                                                            nhi19 * 10, nhi19 * 20,
-                                                                                                            nhi19 * 40, nhi19 * 80)
+                        nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, " \
+                                    "{:4.1f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20,
+                                                         nhi19 * 40, nhi19 * 80)
                         # Overlay HI contours on optical image
                         fig = plt.figure(figsize=(8, 8))
                         ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
@@ -182,9 +186,11 @@ for b in beams:
                         ax1.tick_params(axis='both', which='major', labelsize=18)
                         ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                         ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                        ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes, color='white', fontsize=18)
-                        ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(), width=(bmin/opt_view).decompose(),
-                                              angle=bpa, transform=ax1.transAxes, edgecolor='white', linewidth=1))
+                        ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes, color='white',
+                                 fontsize=18)
+                        ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
+                                              width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
+                                              edgecolor='white', linewidth=1))
 
                         fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
                         hdulist_hi.close()

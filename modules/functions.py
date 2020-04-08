@@ -4,6 +4,39 @@ from astropy.time import Time
 import astropy.units as u
 import numpy as np
 
+from PB_correction_happili2 import *
+
+
+# ----------------------------------------------
+def pbcor(image_name, cb_name, hdu_image, beam, cube):
+    """
+    Find and regrid the model beam to match the image.
+    Apply primary beam correction.
+    :param image_name:
+    :param cb_name:
+    :param hdu_image:
+    :param beam:
+    :param cube:
+    :param chan_range:
+    :return:
+    """
+
+    # Make regridded CB FITS file if it doesn't already exist:
+    if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])):
+        regrid_in_miriad(image_name, cb_name, hdu_image, beam, cube)
+
+    if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
+        hdu_cb = pyfits.open('{}_cb.fits'.format(image_name[:-5]))
+        hdu_cbcor = apply_pb(hdu_image, hdu_cb, image_name)
+        hdu_cb.close()
+    else:
+        print("Compound beam corrected image exists.  Loading existing image.")
+        hdu_cbcor = pyfits.open('{}_cbcor.fits'.format(image_name[:-5]))
+
+    return hdu_cbcor
+
+
+# ----------------------------------------------
 def write_catalog(objects, catHeader, catUnits, catFormat, parList, outName):
     # Determine header sizes based on variable-length formatting
     lenCathead = []
