@@ -11,6 +11,7 @@ from cosmocalc import cosmocalc
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
+import pandas as pd
 from reproject import reproject_interp
 
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
@@ -55,30 +56,34 @@ optical_HI = u.doppler_optical(HI_restfreq)
 H0 = 70.
 
 cube_name = 'HI_image_cube'
-header = ['id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
-          'logMhi', 'SJyHz', 'redshift', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
-          'flag', 'taskid', 'beam', 'cube']
 
-catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
-               "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube",
+header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
+          'logMhi', 'SJyHz', 'redshift', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
+          'flag', 'rms', 'w20', 'w50', 'kin_pa', 'taskid', 'beam', 'cube']
+
+catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
+               "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
+               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "taskid", "beam", "cube",
                "SJyHz", "logMhi", "redshift", "v_sys", "D_Lum", "rms_spec", "SNR")
-catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan",
-               "-", "JY/BEAM", "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-",
-               "JY*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "JY/CHAN", "-")
-catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i",
-               "%8i", "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i",
+catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
+               "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "dunits", "chan", "chan", "pix", "pix", "pix",
+               "pix", "pix", "deg", "deg", "-", "-", "-",
+               "Jy*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "Jy/chan", "-")
+catParFormt = ("%15s", "%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+               "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
+               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i",
                "%13.6f", "%12.6f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f")
 
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     if os.path.isfile(loc + 'clean_cat.txt'):
         # Read in the master catalog of cleaned sources
-        catalog = ascii.read(loc + 'clean_cat.txt')
+        catalog = ascii.read(loc + 'clean_cat.txt', header_start=1)
 
         for c in cubes:
             if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)):
                 cat = catalog[catalog['cube'] == c]
-                cathead = np.array(cat.colnames)
+                cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
                 print("Found {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
 
                 # Read in the cleaned data and original SoFiA mask:
@@ -92,12 +97,13 @@ for b in beams:
                 wcs = WCS(hdu_clean[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
+                # Note that the name column causes big issues because it forces np.array to cast to string, not float!
                 objects = []
                 for source in cat:
                     obj = []
                     for s in source:
                         obj.append(s)
-                    objects.append(obj)
+                    objects.append(obj[1:])
                 objects = np.array(objects)
                 cubelets.writeSubcube(hdu_pb[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
                                       outname, loc, False, False)
@@ -145,6 +151,7 @@ for b in beams:
                     submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
+                    mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
@@ -178,39 +185,40 @@ for b in beams:
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
                     name = c.to_string('hmsdms')
 
-                    if (len(path) != 0) & (not os.path.isfile(loc + outname + '_{}_overlay.png'.format(int(obj[0])))):
+                    if (len(path) != 0):
                         # Get optical image and HI subimage
                         hdulist_opt = path[0]
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
-                        hdulist_hi = fits.open(loc + outname + '_{}_mom0.fits'.format(int(obj[0])))
 
-                        # Reproject HI data & calculate contour properties
-                        hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
-                        rms = np.std(subcube) * chan_width
-                        nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
-                        print("NHI is {}e+19".format(nhi19))
-                        nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, " \
-                                    "{:4.1f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20,
-                                                         nhi19 * 40, nhi19 * 80)
-                        # Overlay HI contours on optical image
-                        fig = plt.figure(figsize=(8, 8))
-                        ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                        ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
-                        ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
-                                                                            rms * 40, rms * 80])
-                        ax1.set_title(name, fontsize=20)
-                        ax1.tick_params(axis='both', which='major', labelsize=18)
-                        ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
-                        ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                        ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes, color='white',
-                                 fontsize=18)
-                        ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
-                                              width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
-                                              edgecolor='white', linewidth=1))
+                        if not os.path.isfile(loc + outname + '_{}_overlay.png'.format(int(obj[0]))):
+                            hdulist_hi = fits.open(loc + outname + '_{}_mom0.fits'.format(int(obj[0])))
+                            # Reproject HI data & calculate contour properties
+                            hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
+                            rms = np.std(subcube) * chan_width
+                            nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
+                            print("1sig N_HI is {}e+19".format(nhi19))
+                            nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, " \
+                                        "{:4.1f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20,
+                                                             nhi19 * 40, nhi19 * 80)
+                            # Overlay HI contours on optical image
+                            fig = plt.figure(figsize=(8, 8))
+                            ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                            ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
+                            ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
+                                                                                rms * 40, rms * 80])
+                            ax1.set_title(name, fontsize=20)
+                            ax1.tick_params(axis='both', which='major', labelsize=18)
+                            ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                            ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                            ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes, color='white',
+                                     fontsize=18)
+                            ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
+                                                  width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
+                                                  edgecolor='white', linewidth=1))
 
-                        fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
-                        hdulist_hi.close()
+                            fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
+                            hdulist_hi.close()
 
                 # Add derived parameters to objects to then be written to catalog:
                 cat['SJyHz'] = SJyHz
@@ -227,7 +235,6 @@ for b in beams:
                     for s in source:
                         obj.append(s)
                     objects.append(obj)
-                objects = np.array(objects)
 
                 # Write out new catalog on a per cube basis:
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'final_cat.txt')
