@@ -102,15 +102,19 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
-header = ['id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix', 'f_min', 'f_max',
-          'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix',
+          'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50', 'ell_maj', 'ell_min', 'ell_pa',
+          'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa', 'taskid', 'beam', 'cube']
 
-catParNames = ("id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max",
-               "n_pix", "f_min", "f_max", "f_sum", "rel", "flag", "taskid", "beam", "cube")
-catParUnits = ("-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-", "JY/BEAM",
-               "JY/BEAM", "JY/BEAM", "-", "-", "-", "-", "-")
-catParFormt = ("%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
-               "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%10i", "%7i", "%7i")
+catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
+               "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
+               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "taskid", "beam", "cube")
+catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
+               "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "dunits", "chan", "chan", "pix", "pix", "pix",
+               "pix", "pix", "deg", "deg", "-", "-", "-")
+catParFormt = ("%30s", "%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+               "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
+               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i")
 
 # prepare = apercal.prepare()
 
@@ -202,7 +206,8 @@ for b in beams:
                 restor.go()
 
             if overwrite:
-                os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5], line_cube[:-5]))
+                os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5],
+                                                                                   line_cube[:-5]))
                 print("WARNING...overwrite won't delete clean_cat.txt file.  Manage this carefully!")
 
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
@@ -224,8 +229,10 @@ for b in beams:
             catalog['taskid'] = np.int(taskid.replace('/',''))
             catalog['beam'] = b
             catalog['cube'] = c
-            catalog_reorder = catalog['id', 'x', 'y', 'z',  'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
-                                      'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'taskid', 'beam', 'cube']
+            catalog_reorder = catalog['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
+                                      'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50',
+                                      'ell_maj', 'ell_min', 'ell_pa', 'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa',
+                                      'taskid', 'beam', 'cube']
             objects = []
             for source in catalog_reorder:
                 obj = []
