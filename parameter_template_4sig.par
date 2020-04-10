@@ -114,8 +114,8 @@ reliability.plot           =  true
 
 # Parameterisation
 
-parameter.enable           =  false
-parameter.wcs              =  true
+parameter.enable           =  true
+parameter.wcs              =  false
 parameter.physical         =  false
 parameter.prefix           =  SoFiA
 parameter.positionOffset   =  false
