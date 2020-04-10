@@ -60,14 +60,12 @@ def write_catalog(objects, catHeader, catUnits, catFormat, parList, outName):
         outFormat += catFormat[index] + " "
         colCount += 1
     header += headerName[3:] + '\n' + headerUnit[3:] + '\n' + headerCol[3:]
-    print(outFormat)
 
     # Create catalogue
     outObjects = []
     for obj in objects:
         outObjects.append([])
         for par in parList: outObjects[-1].append(obj[list(catHeader).index(par)])
-    print(outObjects)
 
     # Write ASCII catalogue
     if os.path.isfile(outName):
