@@ -102,6 +102,7 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
+
 header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix',
           'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50', 'ell_maj', 'ell_min', 'ell_pa',
           'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa', 'taskid', 'beam', 'cube']
@@ -112,7 +113,7 @@ catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", 
 catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
                "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "dunits", "chan", "chan", "pix", "pix", "pix",
                "pix", "pix", "deg", "deg", "-", "-", "-")
-catParFormt = ("%30s", "%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+catParFormt = ("%15s", "%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
                "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i")
 
