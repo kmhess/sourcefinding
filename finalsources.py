@@ -146,12 +146,17 @@ for b in beams:
                     YmaxNew = cPixYNew + maxY
                     if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
+                    # Do some prep for mom1 maps:
+                    freqmin = chan2freq(Zmin,hdu_pb)
+                    freqmax = chan2freq(Zmax,hdu_pb)
+                    velmax = freqmin.to(u.km/u.s, equivalencies=optical_HI).value
+                    velmin = freqmax.to(u.km/u.s, equivalencies=optical_HI).value
+
                     # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
                     subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
                     submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
-                    mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
@@ -184,6 +189,8 @@ for b in beams:
                     path = SkyView.get_images(position=c.to_string('hmsdms'), width=opt_view, height=opt_view,
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
                     name = c.to_string('hmsdms')
+                    # name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                    #                             c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
 
                     if (len(path) != 0):
                         # Get optical image and HI subimage
@@ -219,6 +226,42 @@ for b in beams:
 
                             fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
                             hdulist_hi.close()
+
+                        # Make velocity map
+                        if not os.path.isfile(loc + outname + '_{}_mom1.png'.format(int(obj[0]))):
+                            mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
+                            for i in range(mom1[0].data.shape[0]):
+                                for j in range(mom1[0].data.shape[1]):
+                                    mom1[0].data[i][j] = (mom1[0].data[i][j] * u.Hz).to(u.km/u.s, equivalencies=optical_HI).value
+                                    # Set crazy mom1 values to nan:
+                                    if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
+                                        mom1[0].data[i][j] = np.nan
+                            mom1_reprojected, footprint = reproject_interp(mom1, h2)
+                            v_sys_label = "v_sys = {}, W_50 = {}".format(int(v_sys[-1]), int(obj[cathead == "W50"]))
+                            fig = plt.figure(figsize=(8, 8))
+                            ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                            im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax)
+                            ax1.contour(mom1_reprojected, colors=['white', 'gray', 'black', 'gray', 'white'],
+                                        levels=[v_sys[-1]-100, v_sys[-1]-50, v_sys[-1], v_sys[-1]+50, v_sys[-1]+100],
+                                        linewidths=0.5)
+                            # Plot HI center of galaxy
+                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax.get_transform('icrs'))
+                            ax1.set_title(name, fontsize=20)
+                            ax1.tick_params(axis='both', which='major', labelsize=18)
+                            ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                            ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                            ax1.text(0.7, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
+                                     color='black', fontsize=18)
+                            ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
+                                                  width=(bmin / opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
+                                                  edgecolor='steelblue', linewidth=1))
+                            cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
+                            cbar = fig.colorbar(im, cax=cb_ax)
+                            cbar.set_label("Velocity [km/s]", fontsize=18)
+
+
+                            fig.savefig(loc + outname + '_{}_mom1.png'.format(int(obj[0])), bbox_inches='tight')
+                            mom1.close()
 
                 # Add derived parameters to objects to then be written to catalog:
                 cat['SJyHz'] = SJyHz
