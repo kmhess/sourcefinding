@@ -3,6 +3,7 @@ import sys
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.coordinates import SkyCoord
+from astropy import constants as const
 from astropy.io import ascii, fits
 from astropy import units as u
 from astropy.wcs import WCS
@@ -13,6 +14,7 @@ from matplotlib.patches import Ellipse
 import numpy as np
 import pandas as pd
 from reproject import reproject_interp
+from spectral_cube import SpectralCube
 
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
@@ -114,13 +116,13 @@ for b in beams:
                 bpa = hdu_clean[0].header['BPA']
                 hi_cellsize = hdu_clean[0].header['CDELT2'] * 3600. * u.arcsec
                 pix_per_beam = bmaj/hi_cellsize * bmin/hi_cellsize * np.pi / (4 * np.log(2))
-                chan_width = hdu_clean[0].header['CDELT3']
+                chan_width = hdu_clean[0].header['CDELT3'] * u.Hz
                 opt_view = 6. * u.arcmin
                 opt_pixels = 900
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
-                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR = [], [], [], [], [], [], []
+                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR, w50, w20 = [], [], [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -161,8 +163,10 @@ for b in beams:
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
                     signal = np.nansum(spectrum[int(Zmin):int(Zmax)])
-                    SJyHz.append(signal * chan_width / pix_per_beam)
+                    SJyHz.append(signal * chan_width.value / pix_per_beam)
                     freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
+                    w50.append((const.c * obj[cathead == "w50"][0] * chan_width / freq_sys).to(u.km/u.s).value)
+                    w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_sys).to(u.km/u.s).value)
                     v_sys.append(freq_sys.to(u.km/u.s, equivalencies=optical_HI).value)
                     redshift.append(HI_restfreq / freq_sys - 1.)
                     cosmo = cosmocalc(redshift[-1], H0)
@@ -184,13 +188,12 @@ for b in beams:
                     os.system('rm temp')
 
                     # Get optical image
-                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 1)  # .to_string('hmsdms')
+                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 1)
                     c = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
                     path = SkyView.get_images(position=c.to_string('hmsdms'), width=opt_view, height=opt_view,
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
-                    name = c.to_string('hmsdms')
-                    # name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
-                    #                             c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
+                    name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                                                c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
 
                     if (len(path) != 0):
                         # Get optical image and HI subimage
@@ -202,7 +205,7 @@ for b in beams:
                             hdulist_hi = fits.open(loc + outname + '_{}_mom0.fits'.format(int(obj[0])))
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
-                            rms = np.std(subcube) * chan_width
+                            rms = np.std(subcube) * chan_width.value
                             nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
                             print("1sig N_HI is {}e+19".format(nhi19))
                             nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, " \
@@ -214,6 +217,7 @@ for b in beams:
                             ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
                             ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
                                                                                 rms * 40, rms * 80])
+                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax1.get_transform('fk5'))
                             ax1.set_title(name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
@@ -237,7 +241,7 @@ for b in beams:
                                     if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
                                         mom1[0].data[i][j] = np.nan
                             mom1_reprojected, footprint = reproject_interp(mom1, h2)
-                            v_sys_label = "v_sys = {}, W_50 = {}".format(int(v_sys[-1]), int(obj[cathead == "W50"]))
+                            v_sys_label = "v_sys = {}   W_50 = {}".format(int(v_sys[-1]), int(w50[-1]))
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                             im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax)
@@ -245,12 +249,12 @@ for b in beams:
                                         levels=[v_sys[-1]-100, v_sys[-1]-50, v_sys[-1], v_sys[-1]+50, v_sys[-1]+100],
                                         linewidths=0.5)
                             # Plot HI center of galaxy
-                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax.get_transform('icrs'))
+                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax1.get_transform('fk5'))
                             ax1.set_title(name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                            ax1.text(0.7, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
+                            ax1.text(0.65, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                      color='black', fontsize=18)
                             ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
                                                   width=(bmin / opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
@@ -259,9 +263,25 @@ for b in beams:
                             cbar = fig.colorbar(im, cax=cb_ax)
                             cbar.set_label("Velocity [km/s]", fontsize=18)
 
-
                             fig.savefig(loc + outname + '_{}_mom1.png'.format(int(obj[0])), bbox_inches='tight')
                             mom1.close()
+
+                        # Make pv plot
+                        if not os.path.isfile(loc + outname + '_{}_pv.png'.format(int(obj[0]))):
+                            pv = fits.open(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
+                            pv_rms = np.nanstd(pv[0].data)
+                            # pvfile = SpectralCube.read(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
+                            # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical', rest_value=1.420405752 * u.GHz)
+                            fig = plt.figure(figsize=(8, 8))
+                            ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
+                            im = ax1.imshow(pv[0].data, cmap='gray')
+                            ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
+                            ax1.set_title(name, fontsize=16)
+                            ax1.tick_params(axis='both', which='major', labelsize=18)
+                            ax1.set_xlabel('Angular Offset', fontsize=16)
+                            ax1.set_ylabel('Frequency', fontsize=16)
+                            fig.savefig(loc + outname + '_{}_pv.png'.format(int(obj[0])), bbox_inches='tight')
+                            pv.close()
 
                 # Add derived parameters to objects to then be written to catalog:
                 cat['SJyHz'] = SJyHz
@@ -271,6 +291,11 @@ for b in beams:
                 cat['D_Lum'] = D_Lum
                 cat['rms_spec'] = rms_spec
                 cat['SNR'] = SNR
+
+                # # Replace these for their km/s values instead of pixel values.
+                # cat['w50'] = w50
+                # cat['w20'] = w20
+                # cat['name'] = name.split(" ")[1]
 
                 objects = []
                 for source in cat:
