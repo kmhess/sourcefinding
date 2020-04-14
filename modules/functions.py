@@ -44,6 +44,17 @@ def pbcor(image_name, cb_name, hdu_image, beam, cube):
 
 
 # ----------------------------------------------
+def plot_flags(flag, ax):
+    if flag % 2 == 0:
+        ax.text(0.07, 0.90, "!", ha='center', va='center', transform=ax.transAxes,
+                 color='red', fontsize=24, fontweight='bold')
+    else:
+        ax.text(0.09, 0.90, "!", ha='center', va='center', transform=ax.transAxes,
+                 color='orange', fontsize=24, fontweight='bold')
+    return
+
+
+# ----------------------------------------------
 def write_catalog(objects, catHeader, catUnits, catFormat, parList, outName):
     # Determine header sizes based on variable-length formatting
     lenCathead = []

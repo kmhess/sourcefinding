@@ -12,15 +12,25 @@ from cosmocalc import cosmocalc
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 import numpy as np
-import pandas as pd
 from reproject import reproject_interp
-from spectral_cube import SpectralCube
+from scipy import ndimage
+from scipy.ndimage import generate_binary_structure
+# from spectral_cube import SpectralCube
 
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
 
 from modules.functions import *
 
+
+# For testing nearness of spatial issues:
+# https://stackoverflow.com/questions/10996769/pixel-neighbors-in-2d-array-image-using-python
+def test_mask(value):
+    test = np.any(np.isnan(value))
+    return test
+
+
+foot = np.array(generate_binary_structure(2, 1), dtype=int)
 
 ###################################################################
 
@@ -86,6 +96,7 @@ for b in beams:
                 # Read in the cleaned data and original SoFiA mask:
                 hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
+                hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
                 hdu_pb = pbcor(loc + cube_name + '{}_clean.fits'.format(c),
                                loc + cube_name + '{}_cb-2d.fits'.format(c), hdu_clean, b, c)
@@ -144,8 +155,8 @@ for b in beams:
                     if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
                     # Do some prep for mom1 maps:
-                    freqmin = chan2freq(Zmin,hdu_pb)
-                    freqmax = chan2freq(Zmax,hdu_pb)
+                    freqmin = chan2freq(Zmin, hdu_pb)
+                    freqmax = chan2freq(Zmax, hdu_pb)
                     velmax = freqmin.to(u.km/u.s, equivalencies=optical_HI).value
                     velmin = freqmax.to(u.km/u.s, equivalencies=optical_HI).value
 
@@ -154,6 +165,8 @@ for b in beams:
                     submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
+                    # Create subimage of the continuum filtering to raise flag if it affects source
+                    filter2d = hdu_filter[0].data[0, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
@@ -173,6 +186,16 @@ for b in beams:
                     rms_spec.append(np.std(spectrum[specmask == 0]))
                     SNR.append(signal / (rms_spec[-1] * np.sqrt(Zmax - Zmin)))
 
+                    # Generate some flags based on AAS filter (1) or continuum filtering (2)
+                    flag = 0
+                    if np.any(spectrum[specmask == 1] == 0.0):
+                        flag += 1
+                        print("Spectrum Flag")
+                    result = ndimage.generic_filter(filter2d, test_mask, footprint=foot)
+                    if np.sum(result * mask2d) > 0:
+                        flag += 2
+                        print("Spatial filtering flag")
+
                     # Save spectrum to a txt file:
                     ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
                                 names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
@@ -190,7 +213,7 @@ for b in beams:
                     name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
                                                 c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
 
-                    if (len(path) != 0):
+                    if len(path) != 0:
                         # Get optical image and HI subimage
                         hdulist_opt = path[0]
                         d2 = hdulist_opt[0].data
@@ -212,17 +235,18 @@ for b in beams:
                             ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
                             ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
                                                                                 rms * 40, rms * 80])
-                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax1.get_transform('fk5'))
+                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75,
+                                        transform=ax1.get_transform('fk5'))
                             ax1.set_title(name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                            ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes, color='white',
-                                     fontsize=18)
+                            ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
+                                     color='white', fontsize=18)
                             ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
                                                   width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
                                                   edgecolor='white', linewidth=1))
-
+                            if flag != 0: plot_flags(flag, ax1)
                             fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
                             hdulist_hi.close()
 
@@ -244,7 +268,8 @@ for b in beams:
                                         levels=[v_sys[-1]-100, v_sys[-1]-50, v_sys[-1], v_sys[-1]+50, v_sys[-1]+100],
                                         linewidths=0.5)
                             # Plot HI center of galaxy
-                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75, transform=ax1.get_transform('fk5'))
+                            ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75,
+                                        transform=ax1.get_transform('fk5'))
                             ax1.set_title(name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
@@ -252,21 +277,23 @@ for b in beams:
                             ax1.text(0.65, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                      color='black', fontsize=18)
                             ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
-                                                  width=(bmin / opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
-                                                  edgecolor='steelblue', linewidth=1))
+                                                  width=(bmin / opt_view).decompose(), angle=bpa,
+                                                  transform=ax1.transAxes, edgecolor='steelblue', linewidth=1))
+                            if flag != 0: plot_flags(flag, ax1)
                             cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                             cbar = fig.colorbar(im, cax=cb_ax)
                             cbar.set_label("Velocity [km/s]", fontsize=18)
-
                             fig.savefig(loc + outname + '_{}_mom1.png'.format(int(obj[0])), bbox_inches='tight')
                             mom1.close()
+                            hdulist_opt.close()
 
                         # Make pv plot
                         if not os.path.isfile(loc + outname + '_{}_pv.png'.format(int(obj[0]))):
                             pv = fits.open(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
                             pv_rms = np.nanstd(pv[0].data)
                             # pvfile = SpectralCube.read(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
-                            # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical', rest_value=1.420405752 * u.GHz)
+                            # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical',
+                            #                                  rest_value=1.420405752 * u.GHz)
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
                             im = ax1.imshow(pv[0].data, cmap='gray')
@@ -304,6 +331,7 @@ for b in beams:
 
                 hdu_clean.close()
                 hdu_mask3d.close()
+                hdu_filter.close()
 
             else:
                 print("No CLEAN cube for Beam {:02}, Cube {}".format(b, c))
