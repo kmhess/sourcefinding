@@ -19,12 +19,7 @@ from spectral_cube import SpectralCube
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
 
-from modules.functions import pbcor
-from modules.functions import write_catalog
-
-def chan2freq(channels=None, hdu=None):
-    frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
-    return frequencies
+from modules.functions import *
 
 
 ###################################################################

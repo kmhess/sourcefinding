@@ -8,6 +8,12 @@ from PB_correction_happili2 import *
 
 
 # ----------------------------------------------
+def chan2freq(channels=None, hdu=None):
+    frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
+    return frequencies
+
+
+# ----------------------------------------------
 def pbcor(image_name, cb_name, hdu_image, beam, cube):
     """
     Find and regrid the model beam to match the image.

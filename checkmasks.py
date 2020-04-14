@@ -9,10 +9,7 @@ from astropy.wcs import WCS
 import matplotlib.pyplot as plt
 import numpy as np
 
-def chan2freq(channels=None, hdu=None):
-    frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
-    return frequencies
-
+from modules.functions import chan2freq
 ###################################################################
 
 parser = ArgumentParser(description="Make plots of sourcefinding.py results.",
