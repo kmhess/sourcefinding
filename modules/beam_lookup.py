@@ -6,7 +6,7 @@ def get_dates():
     dates = np.array(['190628', '190722', '190821', '190905', '190916', '191002', '191008', '191023', '191120'])
 
     # *** Until we have a full beam complement ***:
-    dates = np.array(['190628', '191002', '191023'])
+    dates = np.array(['190628', '190821', '191002', '191023'])
     return dates
 
 
@@ -30,6 +30,8 @@ def get_beam_stats(dates):
 
     # *** Until we have a full beam complement ***:
     beams = np.ones([len(dates), 40])
+    beams[dates == '190628', :32] = 0
+    beams[dates == '190821', 4] = 0
 
     return beams
 
