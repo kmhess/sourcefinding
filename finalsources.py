@@ -73,11 +73,11 @@ catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", 
                "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
                "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "taskid", "beam", "cube",
                "SJyHz", "logMhi", "redshift", "v_sys", "D_Lum", "rms_spec", "SNR")
-catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
-               "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "dunits", "chan", "chan", "pix", "pix", "pix",
+catParUnits = ["-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
+               "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "Jy/beam", "km/s", "km/s", "pix", "pix", "pix",
                "pix", "pix", "deg", "deg", "-", "-", "-",
-               "Jy*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "Jy/chan", "-")
-catParFormt = ("%15s", "%10i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
+               "Jy*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "Jy/chan", "-"]
+catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
                "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i",
                "%13.6f", "%12.6f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f")
@@ -102,7 +102,7 @@ for b in beams:
                 pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c), hdu_clean, b, c)
                 hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
-                outname = 'src_taskid{}_beam{:02}_cube{}new'.format(taskid, b, c)
+                outname = 'src_taskid{}_beam{:02}_cube{}'.format(taskid, b, c)
                 # outname_gen = 'beam{:02}_cube{}'.format(b, c)
                 wcs = WCS(hdu_clean[0].header)
 
@@ -175,6 +175,7 @@ for b in beams:
                     signal = np.nansum(spectrum[int(Zmin):int(Zmax)])
                     SJyHz.append(signal * chan_width.value / pix_per_beam)
                     freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
+                    # w50 & w20 in rest frame of the observer
                     w50.append((const.c * obj[cathead == "w50"][0] * chan_width / freq_sys).to(u.km/u.s).value)
                     w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_sys).to(u.km/u.s).value)
                     v_sys.append(freq_sys.to(u.km/u.s, equivalencies=optical_HI).value)
@@ -339,10 +340,11 @@ for b in beams:
                 cat['rms_spec'] = rms_spec
                 cat['SNR'] = SNR
 
-                # # Replace these for their km/s values instead of pixel values.
-                # cat['w50'] = w50
-                # cat['w20'] = w20
-                # cat['name'] = name.split(" ")[1]
+                # Replace these for their km/s values instead of pixel values (Catalog units hard coded above).
+                cat['w50'] = w50
+                cat['w20'] = w20
+                cat['name'] = cat['name'].astype('|S18')
+                cat['name'] = name.split(" ")[1]
 
                 objects = []
                 for source in cat:
