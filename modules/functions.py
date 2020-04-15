@@ -14,7 +14,7 @@ def chan2freq(channels=None, hdu=None):
 
 
 # ----------------------------------------------
-def pbcor(image_name, cb_name, hdu_image, beam, cube):
+def pbcor(taskid, image_name, cb_name, hdu_image, beam, cube):
     """
     Find and regrid the model beam to match the image.
     Apply primary beam correction.
@@ -30,17 +30,17 @@ def pbcor(image_name, cb_name, hdu_image, beam, cube):
     # Make regridded CB FITS file if it doesn't already exist:
     if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])) | \
            os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
-        regrid_in_miriad(image_name, cb_name, hdu_image, beam, cube)
+        regrid_in_miriad(taskid, image_name, cb_name, hdu_image, beam, cube)
 
+    # Make cbcor'ed FITS file if it doesn't already exist:
     if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
         hdu_cb = pyfits.open('{}_cb.fits'.format(image_name[:-5]))
-        hdu_cbcor = apply_pb(hdu_image, hdu_cb, image_name)
+        apply_pb(hdu_image, hdu_cb, image_name)
         hdu_cb.close()
     else:
-        print("Compound beam corrected image exists.  Loading existing image.")
-        hdu_cbcor = pyfits.open('{}_cbcor.fits'.format(image_name[:-5]))
+        print("Compound beam corrected image exists.  Load existing image.")
 
-    return hdu_cbcor
+    return
 
 
 # ----------------------------------------------

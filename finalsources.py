@@ -1,6 +1,8 @@
 import os
 import sys
 
+from modules.functions import *
+
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.coordinates import SkyCoord
 from astropy import constants as const
@@ -19,8 +21,6 @@ from scipy.ndimage import generate_binary_structure
 
 sys.path.insert(0, os.environ['SOFIA_MODULE_PATH'])
 from sofia import cubelets
-
-from modules.functions import *
 
 
 # For testing nearness of spatial issues:
@@ -98,8 +98,9 @@ for b in beams:
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
                 hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
-                hdu_pb = pbcor(loc + cube_name + '{}_clean.fits'.format(c),
-                               loc + cube_name + '{}_cb-2d.fits'.format(c), hdu_clean, b, c)
+                pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c),
+                      loc + cube_name + '{}_cb-2d.fits'.format(c), hdu_clean, b, c)
+                hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
                 outname = 'src_taskid{}_beam{:02}_cube{}new'.format(taskid, b, c)
                 wcs = WCS(hdu_clean[0].header)
@@ -214,7 +215,7 @@ for b in beams:
                                                 c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
 
                     if len(path) != 0:
-                        # Get optical image and HI subimage
+                        # Get optical image and HI subimage for object
                         hdulist_opt = path[0]
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
@@ -250,7 +251,7 @@ for b in beams:
                             fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
                             hdulist_hi.close()
 
-                        # Make velocity map
+                        # Make velocity map for object
                         if not os.path.isfile(loc + outname + '_{}_mom1.png'.format(int(obj[0]))):
                             mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
                             for i in range(mom1[0].data.shape[0]):
@@ -287,7 +288,7 @@ for b in beams:
                             mom1.close()
                             hdulist_opt.close()
 
-                        # Make pv plot
+                        # Make pv plot for object
                         if not os.path.isfile(loc + outname + '_{}_pv.png'.format(int(obj[0]))):
                             pv = fits.open(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
                             pv_rms = np.nanstd(pv[0].data)
@@ -305,7 +306,7 @@ for b in beams:
                             fig.savefig(loc + outname + '_{}_pv.png'.format(int(obj[0])), bbox_inches='tight')
                             pv.close()
 
-                # Add derived parameters to objects to then be written to catalog:
+                # Add derived parameters for objects in cube to then be written to catalog:
                 cat['SJyHz'] = SJyHz
                 cat['logMhi'] = logMhi
                 cat['redshift'] = redshift
@@ -326,12 +327,14 @@ for b in beams:
                         obj.append(s)
                     objects.append(obj)
 
-                # Write out new catalog on a per cube basis:
+                # Write out new or update catalog on a per cube basis:
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'final_cat.txt')
 
+                # Close all related cube files
                 hdu_clean.close()
                 hdu_mask3d.close()
                 hdu_filter.close()
+                hdu_pb.close()
 
             else:
                 print("No CLEAN cube for Beam {:02}, Cube {}".format(b, c))

@@ -10,28 +10,33 @@
 # 3, make a frequency axes for the beam map, devide the Image cube with the beam cube (PB correction) 
 
 import os
-import numpy as np
+
 from astropy.io import fits as pyfits
+import numpy as np
 from apercal.libs import lib
+
+from modules import beam_lookup
 
 
 # ------------------------------------------------
-def regrid_in_miriad(image_name, cb2d_name, hdu_image, b, c):
+def regrid_in_miriad(taskid, image_name, cb2d_name, hdu_image, b, c):
 	"""
 	Find appropriate beam model and set center to center of image.
 	Regrid the beam model image in miriad to the HI image.
 	Expand beam model imagine in 3D.
 	"""
 
-	cb_model_dir = '/tank/apertif/driftscans/fits_files/191023/beam_models/chann_9/'
+	cb_model = beam_lookup.model_lookup(taskid, b)
+	# cb_model_dir = '/tank/apertif/driftscans/fits_files/191023/beam_models/chann_9/'
 
-	hdulist_cb = pyfits.open(cb_model_dir + '191023_{:02}_I_model.fits'.format(b))
+	# hdulist_cb = pyfits.open(cb_model_dir + '191023_{:02}_I_model.fits'.format(b))
+	hdulist_cb = pyfits.open(cb_model)
 	hdulist_cb[0].header['CRVAL1'] = hdu_image[0].header['CRVAL1']
 	hdulist_cb[0].header['CRVAL2'] = hdu_image[0].header['CRVAL2']
 	hdulist_cb.writeto(cb2d_name)
 	hdulist_cb.close()
 
-	print('Regridding in miriad')
+	print('Regridding in miriad using model {}'.format(cb_model))
 	
 	fits = lib.miriad('fits')
 	regrid = lib.miriad('regrid')
@@ -88,4 +93,4 @@ def apply_pb(hdu_image, hdu_cb, image_name):
 	cbcor = pyfits.PrimaryHDU(hdu_image[0].data / hdu_cb[0].data, header=hdu_image[0].header)
 	cbcor.writeto('{}_cbcor.fits'.format(image_name[:-5]))
 
-	return cbcor
+	return
