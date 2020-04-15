@@ -1,6 +1,7 @@
 import os
 import sys
 
+# importing here prevents error messages from apercal
 from modules.functions import *
 
 from argparse import ArgumentParser, RawTextHelpFormatter
@@ -98,8 +99,7 @@ for b in beams:
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
                 hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
-                pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c),
-                      loc + cube_name + '{}_cb-2d.fits'.format(c), hdu_clean, b, c)
+                pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c), hdu_clean, b, c)
                 hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
                 outname = 'src_taskid{}_beam{:02}_cube{}new'.format(taskid, b, c)

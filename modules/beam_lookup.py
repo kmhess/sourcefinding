@@ -61,6 +61,7 @@ def model_lookup(taskid, beam):
     beam_stats = all_beam_stats[:, beam]
 
     # Divide into before & after beam attenuation on October 1st (big impact on beam quality)!
+    taskid = str(taskid)[:6]
     if int(taskid) < 191001:
         # *** Until we have a full beam complement ***:
         index = np.where(all_dates == '190628')[0][0]

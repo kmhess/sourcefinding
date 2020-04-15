@@ -19,20 +19,19 @@ from modules import beam_lookup
 
 
 # ------------------------------------------------
-def regrid_in_miriad(taskid, image_name, cb2d_name, hdu_image, b, c):
+def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	"""
 	Find appropriate beam model and set center to center of image.
 	Regrid the beam model image in miriad to the HI image.
 	Expand beam model imagine in 3D.
 	"""
 
+	# Change the reference pixel of beam model to reference pixel of image to correct
 	cb_model = beam_lookup.model_lookup(taskid, b)
-	# cb_model_dir = '/tank/apertif/driftscans/fits_files/191023/beam_models/chann_9/'
-
-	# hdulist_cb = pyfits.open(cb_model_dir + '191023_{:02}_I_model.fits'.format(b))
 	hdulist_cb = pyfits.open(cb_model)
 	hdulist_cb[0].header['CRVAL1'] = hdu_image[0].header['CRVAL1']
 	hdulist_cb[0].header['CRVAL2'] = hdu_image[0].header['CRVAL2']
+	cb2d_name = '{}_cb-2d.fits'.format(image_name[:-11])
 	hdulist_cb.writeto(cb2d_name)
 	hdulist_cb.close()
 

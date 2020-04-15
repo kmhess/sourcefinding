@@ -14,12 +14,11 @@ def chan2freq(channels=None, hdu=None):
 
 
 # ----------------------------------------------
-def pbcor(taskid, image_name, cb_name, hdu_image, beam, cube):
+def pbcor(taskid, image_name, hdu_image, beam, cube):
     """
     Find and regrid the model beam to match the image.
     Apply primary beam correction.
     :param image_name:
-    :param cb_name:
     :param hdu_image:
     :param beam:
     :param cube:
@@ -30,7 +29,7 @@ def pbcor(taskid, image_name, cb_name, hdu_image, beam, cube):
     # Make regridded CB FITS file if it doesn't already exist:
     if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])) | \
            os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
-        regrid_in_miriad(taskid, image_name, cb_name, hdu_image, beam, cube)
+        regrid_in_miriad(taskid, image_name, hdu_image, beam, cube)
 
     # Make cbcor'ed FITS file if it doesn't already exist:
     if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
