@@ -89,14 +89,14 @@ else:
     beams = [int(b) for b in args.beams.split(',')]
 
 if args.sources == 'all':
-    mask_expr = '"<mask_sofia>.ge.0.5"'
+    mask_expr = '"<mask_sofia>.ge.-1"'
 elif '-' in args.sources:
     mask_range = args.sources.split('-')
     sources = np.array(range(int(mask_range[1])-int(mask_range[0])+1)) + int(mask_range[0])
-    mask_expr = '"(<mask_sofia>.eq.0.5).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0], mask_range[1])
+    mask_expr = '"(<mask_sofia>.eq.-1).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0], mask_range[1])
 else:
     sources = [str(s) for s in args.sources.split(',')]
-    mask_expr = '"(<mask_sofia>.eq.0.5).or.(<mask_sofia>.eq.'+').or.(<mask_sofia>.eq.'.join(sources)+')"'
+    mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.eq.'+').or.(<mask_sofia>.eq.'.join(sources)+')"'
 
 overwrite = args.overwrite
 
