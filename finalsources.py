@@ -103,6 +103,7 @@ for b in beams:
                 hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
                 outname = 'src_taskid{}_beam{:02}_cube{}new'.format(taskid, b, c)
+                # outname_gen = 'beam{:02}_cube{}'.format(b, c)
                 wcs = WCS(hdu_clean[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
@@ -197,15 +198,6 @@ for b in beams:
                         flag += 2
                         print("Spatial filtering flag")
 
-                    # Save spectrum to a txt file:
-                    ascii.write([cube_frequencies, spectrum], loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
-                                names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
-                    os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
-                                                                                                   hi_cellsize))
-                    os.system('cat temp ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])) +
-                              ' > temp2 && mv temp2 ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])))
-                    os.system('rm temp')
-
                     # Get optical image
                     subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 1)
                     c = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
@@ -213,6 +205,7 @@ for b in beams:
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
                     name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
                                                 c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
+                    # filename = loc + name.replace(" ","").replace(".","") + beamcube
 
                     if len(path) != 0:
                         # Get optical image and HI subimage for object
@@ -305,6 +298,37 @@ for b in beams:
                             ax1.set_ylabel('Frequency', fontsize=16)
                             fig.savefig(loc + outname + '_{}_pv.png'.format(int(obj[0])), bbox_inches='tight')
                             pv.close()
+
+                        # Save spectrum to a txt file:
+                        if not os.path.isfile(loc + outname + '_{}_specfull.txt'.format(int(obj[0]))):
+                            ascii.write([cube_frequencies, spectrum],
+                                        loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
+                                        names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+                            os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                                           hi_cellsize))
+                            os.system('cat temp ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])) +
+                                      ' > temp2 && mv temp2 ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])))
+                            os.system('rm temp')
+
+                        # Make spectrum plot:
+                        if not os.path.isfile(loc + outname + '_{}_specfull.png'.format(int(obj[0]))):
+                            cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
+                            optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
+                            maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
+                            maskmax = chan2freq(Zmax, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
+                            fig = plt.figure(figsize=(15, 4))
+                            ax_spec = fig.add_subplot(111)
+                            ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
+                            ax_spec.plot(optical_velocity, spectrum)
+                            ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                            ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                            ax_spec.set_title(name)
+                            ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
+                            if np.max(spectrum) > 10.:
+                                ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
+                            ax_spec.set_ylabel("Integrated Flux")
+                            ax_spec.set_xlabel("Optical Velocity [km/s]")
+                            fig.savefig(loc + outname + '_{}_specfull.png'.format(int(obj[0])), bbox_inches='tight')
 
                 # Add derived parameters for objects in cube to then be written to catalog:
                 cat['SJyHz'] = SJyHz
