@@ -88,6 +88,9 @@ for b in beams:
         sig = 4
         new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
         os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
+<<<<<<< HEAD
 
     # After all cubes are done, run checkmasks to get summary plots for cleaning:
     checkmasks.main(taskid, [b])
+=======
+>>>>>>> streamlined
