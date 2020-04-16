@@ -81,7 +81,7 @@ catParFormt = ("%12s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
 
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
-    print(loc)
+    print("\t{}".format(loc))
     clean_catalog = loc + 'clean_cat.txt'
 
     for c in cubes:
@@ -93,7 +93,7 @@ for b in beams:
 
         if os.path.isfile(mask_cube):
             # Output what exactly is being used to clean the data
-            print(mask_cube)
+            print("\t{}".format(mask_cube))
             # Edit mask cube to trick Miriad into using the whole volume.
             m = pyfits.open(mask_cube, mode='update')
             m[0].data[0, 0, 0] = -1
@@ -128,8 +128,9 @@ for b in beams:
             fits.out = loc + 'beam_00'
             fits.go()
 
+            # Work with mask_sofia in current directory...otherwise worried about miriad character length for mask_expr
             fits.in_ = mask_cube
-            fits.out = loc + 'mask_sofia'
+            fits.out = 'mask_sofia'
             fits.go()
 
             maths = lib.miriad('maths')
@@ -166,7 +167,7 @@ for b in beams:
             if overwrite:
                 os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5],
                                                                                    line_cube[:-5]))
-                print("WARNING...overwrite won't delete clean_cat.txt file.  Manage this carefully!")
+                print("\tWARNING...overwrite won't delete clean_cat.txt file.  Manage this carefully!")
 
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
             fits.op = 'xyout'
@@ -198,6 +199,7 @@ for b in beams:
                     obj.append(s)
                 objects.append(obj)
 
+            print("[CLEAN] Writing/updating cleaned source catalog: clean_cat.txt")
             write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
 
             # Clean up extra Miriad files
