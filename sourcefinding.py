@@ -7,7 +7,7 @@ import numpy as np
 
 def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     param_template = 'parameter_template_{}sig.par'.format(sig)
-    new_paramfile = loc_dir + 'param_scTrel_{}sig.par'.format(sig)
+    new_paramfile = loc_dir + 'parameter_{}sig.par'.format(sig)
     outlog = loc_dir + 'sourcefinding_{}sig.out'.format(sig)
     outroot = cube_name + '_{}sig'.format(sig)
 
@@ -71,7 +71,7 @@ for b in beams:
         sourcefits = loc + cube_name + '.fits'
         filteredfits = loc + cube_name + '_filtered.fits'
         # Output exactly where sourcefinding is starting
-        print(sourcefits)
+        print('\t' + sourcefits)
 
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
         if (not overwrite) & os.path.isfile(filteredfits):
