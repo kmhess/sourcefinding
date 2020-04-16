@@ -63,6 +63,7 @@ overwrite = args.overwrite
 
 cube_name = 'HI_image_cube'
 beam_name = 'HI_beam_cube'
+alta_dir = '/altaZone/archive/apertif_main/visibilities_default/'
 
 header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix',
           'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50', 'ell_maj', 'ell_min', 'ell_pa',
@@ -106,29 +107,33 @@ for b in beams:
             if c == 3: mask[376:662] = False
             lineimagestats = [np.nanmin(f[0].data[mask]), np.nanmax(f[0].data[mask]), np.nanstd(f[0].data[mask])]
             f.close()
-            print("[CLEAN] Image min, max, std: ", lineimagestats[:])
+            print("\tImage min, max, std: {}".format(lineimagestats[:]))
 
             if overwrite:
-                os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+                os.system('rm -rf ' + loc + 'model_* ' + loc + 'beam_* ' + loc + 'map_* ' + loc + 'image_* '
+                          + loc + 'mask_* ' + loc + 'residual_*')
 
             print("[CLEAN] Reading in FITS files, making Miriad mask.")
 
             fits = lib.miriad('fits')
             fits.op = 'xyin'
             fits.in_ = line_cube
-            fits.out = 'map_00'
+            fits.out = loc + 'map_00'
             fits.go()
 
+            if not os.path.isfile(beam_cube):
+                print("[CLEAN] Retrieving synthesized beam cube from ALTA.")
+                os.system('iget {}{}_AP_B0{:02}/HI_beam_cube{}.fits {}'.format(alta_dir, taskid, b, c, loc))
             fits.in_ = beam_cube
-            fits.out = 'beam_00'
+            fits.out = loc + 'beam_00'
             fits.go()
 
             fits.in_ = mask_cube
-            fits.out = 'mask_sofia'
+            fits.out = loc + 'mask_sofia'
             fits.go()
 
             maths = lib.miriad('maths')
-            maths.out = 'mask_00'
+            maths.out = loc + 'mask_00'
             maths.exp = '"<mask_sofia>"'
             maths.mask = mask_expr
             maths.go()
@@ -137,25 +142,25 @@ for b in beams:
             for minc in range(nminiter):
                 print("[CLEAN] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
                 clean = lib.miriad('clean')
-                clean.map = 'map_' + str(minc).zfill(2)
-                clean.beam = 'beam_' + str(minc).zfill(2)
-                clean.out = 'model_' + str(minc + 1).zfill(2)
+                clean.map = loc + 'map_' + str(minc).zfill(2)
+                clean.beam = loc + 'beam_' + str(minc).zfill(2)
+                clean.out = loc + 'model_' + str(minc + 1).zfill(2)
                 clean.cutoff = lineimagestats[2] * 0.5
-                clean.region = '"' + 'mask(mask_' + str(minc).zfill(2) + '/)"'
+                clean.region = '"' + 'mask(' + loc + 'mask_' + str(minc).zfill(2) + '/)"'
                 clean.go()
 
                 print("[CLEAN] Restoring line cube.")
                 restor = lib.miriad('restor')  # Create the restored image
-                restor.model = 'model_' + str(minc + 1).zfill(2)
-                restor.beam = 'beam_' + str(minc).zfill(2)
-                restor.map = 'map_' + str(minc).zfill(2)
-                restor.out = 'image_' + str(minc + 1).zfill(2)
-                restor.mode = 'clean'
+                restor.model = loc + 'model_' + str(minc + 1).zfill(2)
+                restor.beam = loc + 'beam_' + str(minc).zfill(2)
+                restor.map = loc + 'map_' + str(minc).zfill(2)
+                restor.out = loc + 'image_' + str(minc + 1).zfill(2)
+                restor.mode = loc + 'clean'
                 restor.go()
 
                 print("[CLEAN] Making residual cube.")
-                restor.mode = 'residual'  # Create the residual image
-                restor.out = 'residual_' + str(minc + 1).zfill(2)
+                restor.mode = loc + 'residual'  # Create the residual image
+                restor.out = loc + 'residual_' + str(minc + 1).zfill(2)
                 restor.go()
 
             if overwrite:
@@ -165,15 +170,15 @@ for b in beams:
 
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
             fits.op = 'xyout'
-            fits.in_ = 'image_' + str(minc + 1).zfill(2)
+            fits.in_ = loc + 'image_' + str(minc + 1).zfill(2)
             fits.out = line_cube[:-5] + '_clean.fits'
             fits.go()
 
-            fits.in_ = 'residual_' + str(minc + 1).zfill(2)
+            fits.in_ = loc + 'residual_' + str(minc + 1).zfill(2)
             fits.out = line_cube[:-5] + '_residual.fits'
             fits.go()
 
-            fits.in_ = 'model_' + str(minc + 1).zfill(2)
+            fits.in_ = loc + 'model_' + str(minc + 1).zfill(2)
             fits.out = line_cube[:-5] + '_model.fits'
             fits.go()
 
@@ -196,7 +201,8 @@ for b in beams:
             write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
 
             # Clean up extra Miriad files
-            os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+            os.system('rm -rf ' + loc + 'model_* ' + loc + 'beam_* ' + loc + 'map_* ' + loc + 'image_* '
+                      + loc + 'mask_* ' + loc + 'residual_*')
 
     # Will probably need to do some sorting of the catalog if run clean multiple times.  This is a starting point:
     # os.system('head -n +1 {} > temp'.format(clean_catalog))
