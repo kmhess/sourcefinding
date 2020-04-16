@@ -8,48 +8,9 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-import apercal
-from apercal.modules.base import BaseModule
-from apercal.subs import setinit as subs_setinit
-from apercal.subs import managefiles as subs_managefiles
-from apercal.subs import imstats as subs_imstats
 from apercal.libs import lib
 
 from modules.functions import write_catalog
-
-
-# class clean(BaseModule):
-#     """
-#     Clean class does HI source finding, cleaning, restoring within individual beams
-#     """
-#
-#     cleandir = None
-#
-#     def __init__(self, file_=None, **kwargs):
-#         self.default = lib.load_config(self, file_)
-#         subs_setinit.setinitdirs(self)
-#         subs_setinit.setdatasetnamestomiriad(self)
-#
-#     def go(self):
-#         """
-#
-#         :return:
-#         """
-#         logger.info("Starting CLEANING ")
-#         self.clean()
-#         logger.info("CLEANING done ")
-#
-#     def sourcefinding(self):
-
-# Retrieve cubes
-# Check if cube exists
-# Run SoFiA using some set of parameters that I like in sourcefinding.py  DONE (mostly).
-
-# Check if there were sources detected
-# Check the masks in checkmasks.py
-
-# Clean the data iteratively...
-# Return final cubelets??
 
 
 ###################################################################
@@ -117,23 +78,14 @@ catParFormt = ("%12s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
                "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i")
 
-# prepare = apercal.prepare()
-
-# for cube_counter in range(len(self.line_cube_channelwidth_list)):
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     print(loc)
     clean_catalog = loc + 'clean_cat.txt'
 
-    # subs_managefiles.director(self, 'ch', self.cleandir)
-    # subs_managefiles.director(prepare, 'ch', loc)
-
     for c in cubes:
-        # cube_name = self.cleandir + '/cubes/' + self.line_image_cube_name + '{0}.fits'.format(cube_counter)
         line_cube = loc + cube_name + '{0}.fits'.format(c)
-        # beam_cube_name = self.cleandir + '/cubes/' + self.line_image_beam_cube_name + '{0}.fits'.format(cube_counter)
         beam_cube = loc + beam_name + '{0}.fits'.format(c)
-        # mask_cube_name = self.cleandir + '/cubes/' + self.line_image_mask_cube_name+ '{0}.fits'.format(cube_counter)
         mask_cube = loc + cube_name + '{0}_4sig_mask.fits'.format(c)
         filter_cube = loc + cube_name + '{0}_filtered.fits'.format(c)
         catalog_file = loc + cube_name + '{0}_4sig_cat.txt'.format(c)
