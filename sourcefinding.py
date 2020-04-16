@@ -51,7 +51,7 @@ parser.add_argument('-o', "--overwrite",
 args = parser.parse_args()
 
 # Range of cubes/beams to work on:
-dynamic_range_limit = 15.
+# dynamic_range_limit = 15.
 taskid = args.taskid
 cubes = [int(c) for c in args.cubes.split(',')]
 if '-' in args.beams:
@@ -68,7 +68,7 @@ for b in beams:
 
     for c in cubes:
         cube_name = 'HI_image_cube' + str(c)
-        print("Working on Beam {:02} Cube {}".format(b, c))
+        print("[SOURCEFINDING] Working on Beam {:02} Cube {}".format(b, c))
 
         sourcefits = loc + cube_name + '.fits'
         filteredfits = loc + cube_name + '_filtered.fits'
@@ -77,32 +77,32 @@ for b in beams:
 
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
         if (not overwrite) & os.path.isfile(filteredfits):
-            print("\tContinuum filtered file exists and will not be overwritten.")
-            with fits.open(filteredfits, mode='update') as f:
-                # mask = np.ones(f[0].data.shape[0], dtype=bool)  # Commented out because doesn't seem to affect DR when using filtered cube.
-                # if c == 3: mask[376:662] = False
-                nanmax, nanstd = np.nanmax(f[0].data), np.nanstd(f[0].data)
-                dynamic_range = nanmax / nanstd
-                print("\tPsuedo dynamic range, max, std are: {}, {}, {}".format(dynamic_range, nanmax, nanstd))
+            print("[SOURCEFINDING] Continuum filtered file exists and will not be overwritten.")
+            # with fits.open(filteredfits, mode='update') as f:
+            #     # mask = np.ones(f[0].data.shape[0], dtype=bool)  # Commented out because doesn't seem to affect DR when using filtered cube.
+            #     # if c == 3: mask[376:662] = False
+            #     nanmax, nanstd = np.nanmax(f[0].data), np.nanstd(f[0].data)
+            #     dynamic_range = nanmax / nanstd
+            #     print("\tPsuedo dynamic range, max, std are: {}, {}, {}".format(dynamic_range, nanmax, nanstd))
         elif os.path.isfile(sourcefits):
-            print("\tMaking continuum filtered file.")
+            print("[SOURCEFINDING] Making continuum filtered file.")
             os.system('grep -vwE "(input.data)" template_filtering.par > ' + loc + 'filtering.par')
             # if c == 3:
             #     os.system('grep -vwE "(flag.region)" ' + loc + 'filtering.par > temp && mv temp ' + loc + 'filtering.par')
             #     os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + loc + 'filtering.par')
             os.system('echo "input.data                 =  ' + sourcefits + '" >> ' + loc + 'filtering.par')
             os.system('/home/apercal/SoFiA-2/sofia ' + loc + 'filtering.par >> test.log')
-            with fits.open(filteredfits) as f:
-                # mask = np.ones(f[0].data.shape[0], dtype=bool)  # Commented out because doesn't seem to affect DR
-                # if c == 3: mask[376:662] = False
-                nanmax, nanstd = np.nanmax(f[0].data), np.nanstd(f[0].data)
-                dynamic_range = nanmax / nanstd
-                print("\tPsuedo dynamic range, max, std are: {}, {}, {}".format(dynamic_range, nanmax, nanstd))
+            # with fits.open(filteredfits) as f:
+            #     # mask = np.ones(f[0].data.shape[0], dtype=bool)  # Commented out because doesn't seem to affect DR
+            #     # if c == 3: mask[376:662] = False
+            #     nanmax, nanstd = np.nanmax(f[0].data), np.nanstd(f[0].data)
+            #     dynamic_range = nanmax / nanstd
+            #     print("\tPsuedo dynamic range, max, std are: {}, {}, {}".format(dynamic_range, nanmax, nanstd))
         else:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
-        print("\tDOING 4 sigma SOURCE FINDING.")
+        print("[SOURCEFINDING] Doing source finding with 4 sigma threshold.")
         sig = 4
         new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
         os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
