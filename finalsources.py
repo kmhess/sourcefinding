@@ -90,9 +90,10 @@ for b in beams:
 
         for c in cubes:
             if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)):
+                print("[FINALSOURCES] Making cubelets for sources in clean_cat.txt Beam {:02} Cube {}".format(b, c))
                 cat = catalog[catalog['cube'] == c]
                 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
-                print("Found {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
+                print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
 
                 # Read in the cleaned data and original SoFiA mask:
                 hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
@@ -103,7 +104,6 @@ for b in beams:
                 hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
                 outname = 'src_taskid{}_beam{:02}_cube{}'.format(taskid, b, c)
-                # outname_gen = 'beam{:02}_cube{}'.format(b, c)
                 wcs = WCS(hdu_clean[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
@@ -193,11 +193,11 @@ for b in beams:
                     flag = 0
                     if np.any(spectrum[specmask == 1] == 0.0):
                         flag += 1
-                        print("Spectrum Flag")
+                        print("\tSpectrum Flag")
                     result = ndimage.generic_filter(filter2d, test_mask, footprint=foot)
                     if np.sum(result * mask2d) > 0:
                         flag += 2
-                        print("Spatial filtering flag")
+                        print("\tSpatial filtering flag")
 
                     # Get optical image
                     subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 1)
@@ -209,12 +209,14 @@ for b in beams:
                     # filename = loc + name.replace(" ","").replace(".","") + beamcube
 
                     if len(path) != 0:
+                        print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
                         # Get optical image and HI subimage for object
                         hdulist_opt = path[0]
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
 
                         if not os.path.isfile(loc + outname + '_{}_overlay.png'.format(int(obj[0]))):
+                            print("[FINALSOURCES] Making optical overlay for source {}".format(int(obj[0])))
                             hdulist_hi = fits.open(loc + outname + '_{}_mom0.fits'.format(int(obj[0])))
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
@@ -247,6 +249,7 @@ for b in beams:
 
                         # Make velocity map for object
                         if not os.path.isfile(loc + outname + '_{}_mom1.png'.format(int(obj[0]))):
+                            print("[FINALSOURCES] Making velocity map for source {}".format(int(obj[0])))
                             mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
                             for i in range(mom1[0].data.shape[0]):
                                 for j in range(mom1[0].data.shape[1]):
@@ -284,6 +287,7 @@ for b in beams:
 
                         # Make pv plot for object
                         if not os.path.isfile(loc + outname + '_{}_pv.png'.format(int(obj[0]))):
+                            print("[FINALSOURCES] Making pv slice for source {}".format(int(obj[0])))
                             pv = fits.open(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
                             pv_rms = np.nanstd(pv[0].data)
                             # pvfile = SpectralCube.read(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
@@ -302,6 +306,7 @@ for b in beams:
 
                         # Save spectrum to a txt file:
                         if not os.path.isfile(loc + outname + '_{}_specfull.txt'.format(int(obj[0]))):
+                            print("[FINALSOURCES] Making HI spectrum text file for source {}".format(int(obj[0])))
                             ascii.write([cube_frequencies, spectrum],
                                         loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
                                         names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
@@ -313,6 +318,7 @@ for b in beams:
 
                         # Make spectrum plot:
                         if not os.path.isfile(loc + outname + '_{}_specfull.png'.format(int(obj[0]))):
+                            print("[FINALSOURCES] Making HI spectrum plot for source {}".format(int(obj[0])))
                             cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
                             optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
                             maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
@@ -354,6 +360,7 @@ for b in beams:
                     objects.append(obj)
 
                 # Write out new or update catalog on a per cube basis:
+                print("[FINALSOURCES] Writing/updating HI final_cat.txt for Beam {:02} Cube {}".format(b, c))
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'final_cat.txt')
 
                 # Close all related cube files
@@ -363,7 +370,7 @@ for b in beams:
                 hdu_pb.close()
 
             else:
-                print("No CLEAN cube for Beam {:02}, Cube {}".format(b, c))
+                print("\tNo CLEAN cube for Beam {:02}, Cube {}".format(b, c))
     else:
         print("No clean_cat.txt for Beam {:02}".format(b))
 
