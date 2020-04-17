@@ -1,4 +1,5 @@
 import os
+from glob import glob
 import sys
 
 # importing here prevents error messages from apercal
@@ -90,7 +91,6 @@ for b in beams:
 
         for c in cubes:
             if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)):
-                print("[FINALSOURCES] Making cubelets for sources in clean_cat.txt Beam {:02} Cube {}".format(b, c))
                 cat = catalog[catalog['cube'] == c]
                 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
                 print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
@@ -103,7 +103,7 @@ for b in beams:
                 pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c), hdu_clean, b, c)
                 hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
-                outname = 'src_taskid{}_beam{:02}_cube{}'.format(taskid, b, c)
+                outname = 'X_{}_{:02}_{}'.format(taskid, b, c)
                 wcs = WCS(hdu_clean[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
@@ -115,6 +115,7 @@ for b in beams:
                         obj.append(s)
                     objects.append(obj[1:])
                 objects = np.array(objects)
+                print("[FINALSOURCES] Making cubelets for sources in clean_cat.txt Beam {:02} Cube {}".format(b, c))
                 cubelets.writeSubcube(hdu_pb[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
                                       outname, loc, False, False)
 
@@ -204,9 +205,15 @@ for b in beams:
                     c = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
                     path = SkyView.get_images(position=c.to_string('hmsdms'), width=opt_view, height=opt_view,
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
-                    name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
-                                                c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
-                    # filename = loc + name.replace(" ","").replace(".","") + beamcube
+                    src_name = 'AHC J{0}{1}'.format(c.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                                                    c.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
+                    # Having determined source coordinate based name, rename cubelet products:
+                    cubelet_products = glob(loc + outname + '*')
+                    mv_to_name = loc + "AHC" + src_name.split(" ")[1]
+                    for p in cubelet_products:
+                        os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
+                    new_outname = loc + "AHC" + src_name.split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
+                    print(new_outname)
 
                     if len(path) != 0:
                         print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
@@ -215,9 +222,9 @@ for b in beams:
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
 
-                        if not os.path.isfile(loc + outname + '_{}_overlay.png'.format(int(obj[0]))):
-                            print("[FINALSOURCES] Making optical overlay for source {}".format(int(obj[0])))
-                            hdulist_hi = fits.open(loc + outname + '_{}_mom0.fits'.format(int(obj[0])))
+                        if not os.path.isfile(new_outname + '_overlay.png'):
+                            print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname))
+                            hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
                             rms = np.std(subcube) * chan_width.value
@@ -234,7 +241,7 @@ for b in beams:
                                                                                 rms * 40, rms * 80])
                             ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
-                            ax1.set_title(name, fontsize=20)
+                            ax1.set_title(src_name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
@@ -244,13 +251,13 @@ for b in beams:
                                                   width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
                                                   edgecolor='white', linewidth=1))
                             if flag != 0: plot_flags(flag, ax1)
-                            fig.savefig(loc + outname + '_{}_overlay.png'.format(int(obj[0])), bbox_inches='tight')
+                            fig.savefig(new_outname + '_overlay.png', bbox_inches='tight')
                             hdulist_hi.close()
 
                         # Make velocity map for object
-                        if not os.path.isfile(loc + outname + '_{}_mom1.png'.format(int(obj[0]))):
-                            print("[FINALSOURCES] Making velocity map for source {}".format(int(obj[0])))
-                            mom1 = fits.open(loc + outname + '_{}_mom1.fits'.format(int(obj[0])))
+                        if not os.path.isfile(new_outname + '_mom1.png'):
+                            print("[FINALSOURCES] Making velocity map for source {}".format(new_outname))
+                            mom1 = fits.open(new_outname + '_mom1.fits')
                             for i in range(mom1[0].data.shape[0]):
                                 for j in range(mom1[0].data.shape[1]):
                                     mom1[0].data[i][j] = (mom1[0].data[i][j] * u.Hz).to(u.km/u.s, equivalencies=optical_HI).value
@@ -268,7 +275,7 @@ for b in beams:
                             # Plot HI center of galaxy
                             ax1.scatter(c.ra.deg, c.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
-                            ax1.set_title(name, fontsize=20)
+                            ax1.set_title(src_name, fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
@@ -281,44 +288,44 @@ for b in beams:
                             cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                             cbar = fig.colorbar(im, cax=cb_ax)
                             cbar.set_label("Velocity [km/s]", fontsize=18)
-                            fig.savefig(loc + outname + '_{}_mom1.png'.format(int(obj[0])), bbox_inches='tight')
+                            fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
                             mom1.close()
                             hdulist_opt.close()
 
                         # Make pv plot for object
-                        if not os.path.isfile(loc + outname + '_{}_pv.png'.format(int(obj[0]))):
-                            print("[FINALSOURCES] Making pv slice for source {}".format(int(obj[0])))
-                            pv = fits.open(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
+                        if not os.path.isfile(new_outname + '_pv.png'):
+                            print("[FINALSOURCES] Making pv slice for source {}".format(new_outname))
+                            pv = fits.open(new_outname + '_pv.fits')
                             pv_rms = np.nanstd(pv[0].data)
-                            # pvfile = SpectralCube.read(loc + outname + '_{}_pv.fits'.format(int(obj[0])))
+                            # pvfile = SpectralCube.read(new_outname + '_{}_pv.fits')
                             # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical',
                             #                                  rest_value=1.420405752 * u.GHz)
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
                             im = ax1.imshow(pv[0].data, cmap='gray')
                             ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
-                            ax1.set_title(name, fontsize=16)
+                            ax1.set_title(src_name, fontsize=16)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.set_xlabel('Angular Offset', fontsize=16)
                             ax1.set_ylabel('Frequency', fontsize=16)
-                            fig.savefig(loc + outname + '_{}_pv.png'.format(int(obj[0])), bbox_inches='tight')
+                            fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
                             pv.close()
 
                         # Save spectrum to a txt file:
-                        if not os.path.isfile(loc + outname + '_{}_specfull.txt'.format(int(obj[0]))):
-                            print("[FINALSOURCES] Making HI spectrum text file for source {}".format(int(obj[0])))
+                        if not os.path.isfile(new_outname + '_specfull.txt'):
+                            print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname))
                             ascii.write([cube_frequencies, spectrum],
-                                        loc + outname + '_{}_specfull.txt'.format(int(obj[0])),
+                                        new_outname + '_specfull.txt',
                                         names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
                             os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
                                                                                                            hi_cellsize))
-                            os.system('cat temp ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])) +
-                                      ' > temp2 && mv temp2 ' + loc + outname + '_{}_specfull.txt'.format(int(obj[0])))
+                            os.system('cat temp ' + new_outname + '_specfull.txt' +
+                                      ' > temp2 && mv temp2 ' + new_outname + '_specfull.txt')
                             os.system('rm temp')
 
                         # Make spectrum plot:
-                        if not os.path.isfile(loc + outname + '_{}_specfull.png'.format(int(obj[0]))):
-                            print("[FINALSOURCES] Making HI spectrum plot for source {}".format(int(obj[0])))
+                        if not os.path.isfile(new_outname + '_specfull.png'):
+                            print("[FINALSOURCES] Making HI spectrum plot for source {}".format(new_outname))
                             cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
                             optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
                             maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
@@ -329,13 +336,15 @@ for b in beams:
                             ax_spec.plot(optical_velocity, spectrum)
                             ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                             ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec.set_title(name)
+                            ax_spec.set_title(src_name)
                             ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
                             if np.max(spectrum) > 10.:
-                                ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
+                                ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[Zmin:Zmax]) * 2)
+                            if np.max(spectrum) < -10.:
+                                ax_spec.set_ylim(np.min(spectrum[Zmin:Zmax]) * 2, np.max(spectrum) * 1.05)
                             ax_spec.set_ylabel("Integrated Flux")
                             ax_spec.set_xlabel("Optical Velocity [km/s]")
-                            fig.savefig(loc + outname + '_{}_specfull.png'.format(int(obj[0])), bbox_inches='tight')
+                            fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
 
                 # Add derived parameters for objects in cube to then be written to catalog:
                 cat['SJyHz'] = SJyHz
@@ -350,7 +359,7 @@ for b in beams:
                 cat['w50'] = w50
                 cat['w20'] = w20
                 cat['name'] = cat['name'].astype('|S18')
-                cat['name'] = name.split(" ")[1]
+                cat['name'] = src_name.split(" ")[1]
 
                 objects = []
                 for source in cat:
@@ -360,8 +369,9 @@ for b in beams:
                     objects.append(obj)
 
                 # Write out new or update catalog on a per cube basis:
-                print("[FINALSOURCES] Writing/updating HI final_cat.txt for Beam {:02} Cube {}".format(b, c))
-                write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'final_cat.txt')
+                print("[FINALSOURCES] Updating HI final_cat.txt for Beam {:02} Cube {} in taskid directory".format(b, c))
+                # write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc[:-5] + 'final_cat.txt')
+                write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName='final_cat.txt')
 
                 # Close all related cube files
                 hdu_clean.close()
