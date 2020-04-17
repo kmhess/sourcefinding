@@ -31,7 +31,7 @@ def get_beam_stats(dates):
     # *** Until we have a full beam complement ***:
     beams = np.ones([len(dates), 40])
     beams[dates == '190628', :32] = 0
-    beams[dates == '190821', 4] = 0
+    beams[dates == '190821', 4] = 1   # best we have at the moment, but would flip to 0 if better comes!
 
     return beams
 
