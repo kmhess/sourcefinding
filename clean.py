@@ -53,7 +53,7 @@ if args.sources == 'all':
     mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.ge.1)"'
 elif '-' in args.sources:
     mask_range = args.sources.split('-')
-    sources = np.array(range(int(mask_range[1])-int(mask_range[0])+1)) + int(mask_range[0])
+    sources = [str(s + int(mask_range[0])) for s in range(int(mask_range[1])-int(mask_range[0])+1)]
     mask_expr = '"(<mask_sofia>.eq.-1).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0], mask_range[1])
 else:
     sources = [str(s) for s in args.sources.split(',')]
@@ -183,7 +183,6 @@ for b in beams:
             fits.out = line_cube[:-5] + '_model.fits'
             fits.go()
 
-            # If everything was successful and didn't crash for a given beam/cube:
             catalog = ascii.read(catalog_file, header_start=10)
             catalog['taskid'] = np.int(taskid.replace('/',''))
             catalog['beam'] = b
@@ -192,12 +191,19 @@ for b in beams:
                                       'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50',
                                       'ell_maj', 'ell_min', 'ell_pa', 'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa',
                                       'taskid', 'beam', 'cube']
+
+            if args.sources == 'all':
+                sources = [str(s+1) for s in range(len(catalog))]
+
+            # If everything was successful and didn't crash for a given beam/cube:
+            # Copy SoFiA catalog for *cleaned* sources to clean_cat.txt (Same for all cubes in a beam).
             objects = []
             for source in catalog_reorder:
-                obj = []
-                for s in source:
-                    obj.append(s)
-                objects.append(obj)
+                if str(source['id']) in sources:
+                    obj = []
+                    for s in source:
+                        obj.append(s)
+                    objects.append(obj)
 
             print("[CLEAN] Writing/updating cleaned source catalog: clean_cat.txt")
             write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
