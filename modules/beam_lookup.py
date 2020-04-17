@@ -58,7 +58,7 @@ def model_lookup(taskid, beam):
     all_dates = get_dates()
     all_beam_stats = get_beam_stats(all_dates)
     if beam > all_beam_stats.shape[1] - 1:
-        print("{}: Pick a valid beam number 0-39.".format(beam))
+        print("\t{}: Pick a valid beam number 0-39.".format(beam))
         exit()
     beam_stats = all_beam_stats[:, beam]
 
@@ -66,7 +66,7 @@ def model_lookup(taskid, beam):
     taskid = str(taskid)[:6]
     if int(taskid) < 191001:
         # *** Until we have a full beam complement ***:
-        index = np.where(all_dates == '190628')[0][0]
+        index = np.where(all_dates == '190821')[0][0]
         # index = np.where(all_dates == '190916')[0][0]
         dates = all_dates[:index + 1]
         beams = beam_stats[:index + 1]
@@ -75,8 +75,9 @@ def model_lookup(taskid, beam):
         dates = all_dates[index:]
         beams = beam_stats[index:]
 
+    print("[MODEL_LOOKUP] Searching for appropriate beam model for beam {}.".format(beam))
     if np.all(beams == 0):
-        print("No good beam model options for period when this was observed. Do more drift scans (or edit code).")
+        print("\tNo good beam model options for period when this was observed. Do more drift scans (or edit code).")
         exit()
     elif len(beams[beams == 1]) == 1:
         # If only one good beam model exists, use it.
