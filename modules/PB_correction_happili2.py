@@ -35,7 +35,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	hdulist_cb.writeto(cb2d_name)
 	hdulist_cb.close()
 
-	print('Regridding in miriad using model {}'.format(cb_model))
+	print('\tRegridding in miriad using model {}'.format(cb_model))
 	
 	fits = lib.miriad('fits')
 	regrid = lib.miriad('regrid')
@@ -70,7 +70,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	d_beam_cube = d_new * hdu_cb[0].data
 	hdu_cb[0].data = np.float32(d_beam_cube)
 
-	print('Writing beam cube.')
+	print('\tWriting beam cube.')
 	hdu_cb.writeto('{}_cb.fits'.format(image_name[:-5]))
 
 	hdu_cb.close()
@@ -87,7 +87,7 @@ def apply_pb(hdu_image, hdu_cb, image_name):
 	chan_range produces a smaller HI cube with a subset of channels.
 	Writes out the beam cube as a fits file and the PB corrected cube.
 	"""
-	print('Doing compound beam correction')
+	print('[APPLY_PB] Doing compound beam correction.')
 
 	cbcor = pyfits.PrimaryHDU(hdu_image[0].data / hdu_cb[0].data, header=hdu_image[0].header)
 	cbcor.writeto('{}_cbcor.fits'.format(image_name[:-5]))
