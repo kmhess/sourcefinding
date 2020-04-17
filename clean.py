@@ -50,7 +50,7 @@ else:
     beams = [int(b) for b in args.beams.split(',')]
 
 if args.sources == 'all':
-    mask_expr = '"<mask_sofia>.ge.-1"'
+    mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.ge.1)"'
 elif '-' in args.sources:
     mask_range = args.sources.split('-')
     sources = np.array(range(int(mask_range[1])-int(mask_range[0])+1)) + int(mask_range[0])
@@ -111,7 +111,7 @@ for b in beams:
 
             if overwrite:
                 os.system('rm -rf ' + loc + 'model_* ' + loc + 'beam_* ' + loc + 'map_* ' + loc + 'image_* '
-                          + loc + 'mask_* ' + loc + 'residual_*')
+                          + loc + 'mask_* ' + loc + 'residual_* mask_sofia')
 
             print("[CLEAN] Reading in FITS files, making Miriad mask.")
 
@@ -156,11 +156,11 @@ for b in beams:
                 restor.beam = loc + 'beam_' + str(minc).zfill(2)
                 restor.map = loc + 'map_' + str(minc).zfill(2)
                 restor.out = loc + 'image_' + str(minc + 1).zfill(2)
-                restor.mode = loc + 'clean'
+                restor.mode = 'clean'
                 restor.go()
 
                 print("[CLEAN] Making residual cube.")
-                restor.mode = loc + 'residual'  # Create the residual image
+                restor.mode = 'residual'  # Create the residual image
                 restor.out = loc + 'residual_' + str(minc + 1).zfill(2)
                 restor.go()
 
@@ -204,7 +204,7 @@ for b in beams:
 
             # Clean up extra Miriad files
             os.system('rm -rf ' + loc + 'model_* ' + loc + 'beam_* ' + loc + 'map_* ' + loc + 'image_* '
-                      + loc + 'mask_* ' + loc + 'residual_*')
+                      + loc + 'mask_* ' + loc + 'residual_* mask_sofia')
 
     # Will probably need to do some sorting of the catalog if run clean multiple times.  This is a starting point:
     # os.system('head -n +1 {} > temp'.format(clean_catalog))
