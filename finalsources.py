@@ -213,7 +213,6 @@ for b in beams:
                     for p in cubelet_products:
                         os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
                     new_outname = loc + "AHC" + src_name.split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
-                    print(new_outname)
 
                     if len(path) != 0:
                         print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
@@ -222,23 +221,22 @@ for b in beams:
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
 
-                        if not os.path.isfile(new_outname + '_overlay.png'):
+                        if not os.path.isfile(new_outname + '_mom0.png'):
                             print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
                             rms = np.nanstd(subcube) * chan_width.value
                             nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
-                            print("1sig N_HI is {}e+19".format(nhi19))
-                            nhi_label = "N_HI ={:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, {:4.1f}, " \
-                                        "{:4.1f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20,
-                                                             nhi19 * 40, nhi19 * 80)
+                            print("\t1sig N_HI is {}e+19".format(nhi19))
+                            nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
+                                        "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
                             # Overlay HI contours on optical image
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                             ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
                             ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
-                                                                                rms * 40, rms * 80])
+                                                                                rms * 40]) #, rms * 80]
                             ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
                             ax1.set_title(src_name, fontsize=20)
@@ -251,7 +249,7 @@ for b in beams:
                                                   width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
                                                   edgecolor='white', linewidth=1))
                             if flag != 0: plot_flags(flag, ax1)
-                            fig.savefig(new_outname + '_overlay.png', bbox_inches='tight')
+                            fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
                             hdulist_hi.close()
 
                         # Make velocity map for object
@@ -265,7 +263,7 @@ for b in beams:
                                     if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
                                         mom1[0].data[i][j] = np.nan
                             mom1_reprojected, footprint = reproject_interp(mom1, h2)
-                            v_sys_label = "v_sys = {}   W_50 = {}".format(int(v_sys[-1]), int(w50[-1]))
+                            v_sys_label = "v_sys = {}   W_50 = {}  W_20 = {}".format(int(v_sys[-1]), int(w50[-1]), int(w20[-1]))
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                             im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax)
@@ -279,7 +277,7 @@ for b in beams:
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                            ax1.text(0.65, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
+                            ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                      color='black', fontsize=18)
                             ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
                                                   width=(bmin / opt_view).decompose(), angle=bpa,
@@ -384,7 +382,7 @@ for b in beams:
             else:
                 print("\tNo CLEAN cube for Beam {:02}, Cube {}".format(b, c))
     else:
-        print("No clean_cat.txt for Beam {:02}".format(b))
+        print("\tNo clean_cat.txt for Beam {:02}".format(b))
 
-print("Beam info in *specfull.txt can be read from the text files like: a.meta['comments'][0].replace('= ','').split()")
+print("\tBeam info in *specfull.txt can be read from the text files like: a.meta['comments'][0].replace('= ','').split()")
 print("[FINALSOURCES] Done.")

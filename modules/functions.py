@@ -37,7 +37,7 @@ def pbcor(taskid, image_name, hdu_image, beam, cube):
         apply_pb(hdu_image, hdu_cb, image_name)
         hdu_cb.close()
     else:
-        print("Compound beam corrected image exists.  Load existing image.")
+        print("\tCompound beam corrected image exists.  Load existing image.")
 
     return
 
