@@ -97,8 +97,8 @@ threshold.fluxRange        =  negative
 
 # Linker
 
-linker.radiusXY            =  1
-linker.radiusZ             =  2
+linker.radiusXY            =  2
+linker.radiusZ             =  3
 linker.minSizeXY           =  5
 linker.minSizeZ            =  5
 linker.maxSizeXY           =  0
