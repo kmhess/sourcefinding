@@ -201,7 +201,7 @@ for b in beams:
                         print("\tSpatial filtering flag")
 
                     # Get optical image
-                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 1)
+                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
                     hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
                     path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
