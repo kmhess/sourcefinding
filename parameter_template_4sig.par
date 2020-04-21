@@ -38,6 +38,7 @@
 
 pipeline.verbose           =  false
 pipeline.pedantic          =  true
+pipeline.threads           =  0
 
 
 # Input
@@ -56,14 +57,16 @@ input.invert               =  false
 flag.region                =  
 flag.auto                  =  false
 flag.threshold             =  5.0
-flag.log                   =  false
 flag.radiusSpatial         =  0
+flag.log                   =  false
 
 
 # Noise scaling
 
 scaleNoise.enable          =  true
 scaleNoise.mode            =  spectral
+scaleNoise.statistic       =  mad
+scaleNoise.fluxRange       =  negative
 scaleNoise.windowXY        =  25
 scaleNoise.windowZ         =  15
 scaleNoise.gridXY          =  0
@@ -110,6 +113,13 @@ reliability.threshold      =  0.9
 reliability.scaleKernel    =  0.5
 reliability.fmin           =  20.0
 reliability.plot           =  true
+
+
+# Mask dilation
+
+dilation.enable            =  false
+dilation.iterations        =  10
+dilation.threshold         =  0.001
 
 
 # Parameterisation
