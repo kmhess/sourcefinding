@@ -9,7 +9,7 @@ modules/__pycache__
 .idea/
 readme.txt
 cleaning_whiteboard.png
-old/
+old/*
 
 # Data folders
 19*/
