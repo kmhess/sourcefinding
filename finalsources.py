@@ -52,7 +52,7 @@ parser.add_argument('-c', '--cubes', default='1,2,3',
 args = parser.parse_args()
 
 # Range of cubes/beams to work on:
-taskid = args.taskid
+taskid = args.taskid.replace("/", "")
 cubes = [int(c) for c in args.cubes.split(',')]
 if '-' in args.beams:
     b_range = args.beams.split('-')
@@ -221,6 +221,7 @@ for b in beams:
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
 
+                        # Make a total intensity map overlayed on optical
                         if not os.path.isfile(new_outname + '_mom0.png'):
                             print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
@@ -234,7 +235,7 @@ for b in beams:
                             # Overlay HI contours on optical image
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                            ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8))
+                            ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
                             ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
                                                                                 rms * 40]) #, rms * 80]
                             ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
@@ -266,7 +267,7 @@ for b in beams:
                             v_sys_label = "v_sys = {}   W_50 = {}  W_20 = {}".format(int(v_sys[-1]), int(w50[-1]), int(w20[-1]))
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                            im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax)
+                            im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax, origin='lower')
                             ax1.contour(mom1_reprojected, colors=['white', 'gray', 'black', 'gray', 'white'],
                                         levels=[v_sys[-1]-100, v_sys[-1]-50, v_sys[-1], v_sys[-1]+50, v_sys[-1]+100],
                                         linewidths=0.5)
