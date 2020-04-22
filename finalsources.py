@@ -131,7 +131,8 @@ for b in beams:
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
-                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR, w50, w20 = [], [], [], [], [], [], [], [], []
+
+                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR, w50, w20, src_name = [], [], [], [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -205,14 +206,14 @@ for b in beams:
                     hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
                     path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
                                               survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
-                    src_name = 'AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
-                                                    hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True))
+                    src_name.append('AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                                                    hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
                     # Having determined source coordinate based name, rename cubelet products:
                     cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '*')
-                    mv_to_name = loc + "AHC" + src_name.split(" ")[1]
+                    mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
                     for p in cubelet_products:
                         os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
-                    new_outname = loc + "AHC" + src_name.split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
+                    new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
 
                     if len(path) != 0:
                         print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
@@ -240,7 +241,7 @@ for b in beams:
                                                                                 rms * 40]) #, rms * 80]
                             ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
-                            ax1.set_title(src_name, fontsize=20)
+                            ax1.set_title(src_name[-1], fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
@@ -274,7 +275,7 @@ for b in beams:
                             # Plot HI center of galaxy
                             ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
-                            ax1.set_title(src_name, fontsize=20)
+                            ax1.set_title(src_name[-1], fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                             ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
@@ -303,7 +304,7 @@ for b in beams:
                             ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
                             im = ax1.imshow(pv[0].data, cmap='gray')
                             ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
-                            ax1.set_title(src_name, fontsize=16)
+                            ax1.set_title(src_name[-1], fontsize=16)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.set_xlabel('Angular Offset', fontsize=16)
                             ax1.set_ylabel('Frequency', fontsize=16)
@@ -335,7 +336,7 @@ for b in beams:
                             ax_spec.plot(optical_velocity, spectrum)
                             ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                             ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec.set_title(src_name)
+                            ax_spec.set_title(src_name[-1])
                             ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
                             if np.max(spectrum) > 10.:
                                 ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[int(Zmin):int(Zmax)+1+1]) * 2)
@@ -359,8 +360,10 @@ for b in beams:
                 # Replace these for their km/s values instead of pixel values (Catalog units hard coded above).
                 cat['w50'] = w50
                 cat['w20'] = w20
+                
                 cat['name'] = cat['name'].astype('|S18')
-                cat['name'] = src_name.split(" ")[1]
+                src_name = [srcname.split(" ")[1] for srcname in src_name]
+                cat['name'] = src_name
 
                 objects = []
                 for source in cat:
