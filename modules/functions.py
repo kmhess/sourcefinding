@@ -44,12 +44,12 @@ def pbcor(taskid, image_name, hdu_image, beam, cube):
 
 # ----------------------------------------------
 def plot_flags(flag, ax):
-    if flag % 2 == 0:
-        ax.text(0.07, 0.90, "!", ha='center', va='center', transform=ax.transAxes,
-                 color='red', fontsize=24, fontweight='bold')
-    else:
+    if flag % 2 != 0:
         ax.text(0.09, 0.90, "!", ha='center', va='center', transform=ax.transAxes,
                  color='orange', fontsize=24, fontweight='bold')
+    if flag >= 2:
+        ax.text(0.07, 0.90, "!", ha='center', va='center', transform=ax.transAxes,
+                color='red', fontsize=24, fontweight='bold')
     return
 
 
