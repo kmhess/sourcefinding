@@ -76,7 +76,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	hdu_cb.close()
 
 	# Clean up the extra Miriad & 2D cb files
-	os.system('rm -rf *.mir')
+	os.system('rm -rf {}*.mir'.format(image_name[:-5]))
 	os.system('rm -rf {}*'.format(cb2d_name[:-5]))
 
 
