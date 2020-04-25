@@ -164,10 +164,10 @@ for b in beams:
                 restor.mode = 'clean'
                 restor.go()
 
-                print("[CLEAN] Making residual cube.")
-                restor.mode = 'residual'  # Create the residual image
-                restor.out = 'residual_' + str(minc + 1).zfill(2)
-                restor.go()
+                # print("[CLEAN] Making residual cube.")
+                # restor.mode = 'residual'  # Create the residual image
+                # restor.out = loc + 'residual_' + str(minc + 1).zfill(2)
+                # restor.go()
 
             if overwrite:
                 os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5],
@@ -180,9 +180,9 @@ for b in beams:
             fits.out = line_cube[:-5] + '_clean.fits'
             fits.go()
 
-            fits.in_ = 'residual_' + str(minc + 1).zfill(2)
-            fits.out = line_cube[:-5] + '_residual.fits'
-            fits.go()
+            # fits.in_ = loc + 'residual_' + str(minc + 1).zfill(2)
+            # fits.out = line_cube[:-5] + '_residual.fits'
+            # fits.go()
 
             fits.in_ = loc + 'model_' + str(minc + 1).zfill(2)
             fits.out = line_cube[:-5] + '_model.fits'

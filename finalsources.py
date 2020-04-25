@@ -201,19 +201,22 @@ for b in beams:
                         flag += 2
                         print("\tSpatial filtering flag")
 
-                    # Get optical image
+                    # Determine HI position of galaxy & therefore source name
                     subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
                     hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
-                    path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
-                                              survey=['DSS2 Blue'], pixels=[opt_pixels, opt_pixels])
                     src_name.append('AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
                                                     hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
+
                     # Having determined source coordinate based name, rename cubelet products:
                     cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '*')
                     mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
                     for p in cubelet_products:
                         os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
                     new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
+
+                    # Get optical image
+                    path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
+                                              survey=['DSS2 Blue'], pixels=opt_pixels)
 
                     if len(path) != 0:
                         print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
@@ -291,62 +294,64 @@ for b in beams:
                             fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
                             mom1.close()
                             hdulist_opt.close()
+                    else:
+                        print("\tWARNING: No optical image found, so no moment png's produced")
 
-                        # Make pv plot for object
-                        if not os.path.isfile(new_outname + '_pv.png'):
-                            print("[FINALSOURCES] Making pv slice for source {}".format(new_outname.split("/")[-1]))
-                            pv = fits.open(new_outname + '_pv.fits')
-                            pv_rms = np.nanstd(pv[0].data)
-                            # pvfile = SpectralCube.read(new_outname + '_{}_pv.fits')
-                            # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical',
-                            #                                  rest_value=1.420405752 * u.GHz)
-                            fig = plt.figure(figsize=(8, 8))
-                            ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
-                            im = ax1.imshow(pv[0].data, cmap='gray')
-                            ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
-                            ax1.set_title(src_name[-1], fontsize=16)
-                            ax1.tick_params(axis='both', which='major', labelsize=18)
-                            ax1.set_xlabel('Angular Offset', fontsize=16)
-                            ax1.set_ylabel('Frequency', fontsize=16)
-                            fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
-                            pv.close()
+                    # Make pv plot for object
+                    if not os.path.isfile(new_outname + '_pv.png'):
+                        print("[FINALSOURCES] Making pv slice for source {}".format(new_outname.split("/")[-1]))
+                        pv = fits.open(new_outname + '_pv.fits')
+                        pv_rms = np.nanstd(pv[0].data)
+                        # pvfile = SpectralCube.read(new_outname + '_{}_pv.fits')
+                        # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical',
+                        #                                  rest_value=1.420405752 * u.GHz)
+                        fig = plt.figure(figsize=(8, 8))
+                        ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
+                        im = ax1.imshow(pv[0].data, cmap='gray')
+                        ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
+                        ax1.set_title(src_name[-1], fontsize=16)
+                        ax1.tick_params(axis='both', which='major', labelsize=18)
+                        ax1.set_xlabel('Angular Offset', fontsize=16)
+                        ax1.set_ylabel('Frequency', fontsize=16)
+                        fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
+                        pv.close()
 
-                        # Save spectrum to a txt file:
-                        if not os.path.isfile(new_outname + '_specfull.txt'):
-                            print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname.split("/")[-1]))
-                            ascii.write([cube_frequencies, spectrum],
-                                        new_outname + '_specfull.txt',
-                                        names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
-                            os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
-                                                                                                           hi_cellsize))
-                            os.system('cat temp ' + new_outname + '_specfull.txt' +
-                                      ' > temp2 && mv temp2 ' + new_outname + '_specfull.txt')
-                            os.system('rm temp')
+                    # Save spectrum to a txt file:
+                    if not os.path.isfile(new_outname + '_specfull.txt'):
+                        print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname.split("/")[-1]))
+                        ascii.write([cube_frequencies, spectrum],
+                                    new_outname + '_specfull.txt',
+                                    names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+                        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                                       hi_cellsize))
+                        os.system('cat temp ' + new_outname + '_specfull.txt' +
+                                  ' > temp2 && mv temp2 ' + new_outname + '_specfull.txt')
+                        os.system('rm temp')
 
-                        # Make spectrum plot:
-                        if not os.path.isfile(new_outname + '_specfull.png'):
-                            print("[FINALSOURCES] Making HI spectrum plot for source {}".format(new_outname.split("/")[-1]))
-                            cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
-                            optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
-                            maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
-                            maskmax = chan2freq(Zmax, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
-                            fig = plt.figure(figsize=(15, 4))
-                            ax_spec = fig.add_subplot(111)
-                            ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
-                            ax_spec.plot(optical_velocity, spectrum)
-                            ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec.set_title(src_name[-1])
-                            ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                            if np.max(spectrum) > 10.:
-                                ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[int(Zmin):int(Zmax)+1+1]) * 2)
-                            if np.max(spectrum) < -10.:
-                                ax_spec.set_ylim(np.min(spectrum[int(Zmin):int(Zmax)+1+1]) * 2, np.max(spectrum) * 1.05)
-                            ax_spec.set_ylabel("Integrated Flux")
-                            ax_spec.set_xlabel("Optical Velocity [km/s]")
-                            fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
+                    # Make spectrum plot:
+                    if not os.path.isfile(new_outname + '_specfull.png'):
+                        print("[FINALSOURCES] Making HI spectrum plot for source {}".format(new_outname.split("/")[-1]))
+                        cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
+                        optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
+                        maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
+                        maskmax = chan2freq(Zmax, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
+                        fig = plt.figure(figsize=(15, 4))
+                        ax_spec = fig.add_subplot(111)
+                        ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
+                        ax_spec.plot(optical_velocity, spectrum)
+                        ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                        ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                        ax_spec.set_title(src_name[-1])
+                        ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
+                        if np.max(spectrum) > 10.:
+                            ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[int(Zmin):int(Zmax)+1+1]) * 2)
+                        if np.max(spectrum) < -10.:
+                            ax_spec.set_ylim(np.min(spectrum[int(Zmin):int(Zmax)+1+1]) * 2, np.max(spectrum) * 1.05)
+                        ax_spec.set_ylabel("Integrated Flux")
+                        ax_spec.set_xlabel("Optical Velocity [km/s]")
+                        fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
 
-                        plt.close('all')
+                    plt.close('all')
 
                 # Add derived parameters for objects in cube to then be written to catalog:
                 cat['SJyHz'] = SJyHz
