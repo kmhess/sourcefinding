@@ -118,7 +118,7 @@ parameter.enable           =  false
 parameter.wcs              =  true
 parameter.physical         =  false
 parameter.prefix           =  SoFiA
-parameter.positionOffset   =  false
+parameter.offset           =  false
 
 
 # Output
