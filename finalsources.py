@@ -208,7 +208,8 @@ for b in beams:
                                                     hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
 
                     # Having determined source coordinate based name, rename cubelet products:
-                    cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '*')
+                    cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '_*')
+                    cubelet_products += glob(loc + outname + "_" + str(int(obj[0])) + '.fits')
                     mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
                     for p in cubelet_products:
                         os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
