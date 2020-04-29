@@ -29,9 +29,11 @@ def parse_args():
     return args
 
 
+# If running by itself use: python -m src/checkmasks -t 191004041 -b 14
 def main(taskid, beams):
 
     cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
+    max_cat_len = 25
 
     HI_restfreq = 1420405751.77 * u.Hz
     optical_HI = u.doppler_optical(HI_restfreq)
@@ -55,6 +57,8 @@ def main(taskid, beams):
             for c in cubes:
                 if os.path.isfile(loc + cube_name + '{}_4sig_cat.txt'.format(c)):
                     cat = ascii.read(loc + cube_name + '{}_4sig_cat.txt'.format(c))
+                    if len(cat) > max_cat_len:
+                        cat = cat[:max_cat_len]
                     source_per_beam += len(cat)
             fig_spec, ax_spec = plt.subplots(source_per_beam, 1, figsize=(15, 3*source_per_beam), squeeze=False)
 
@@ -68,6 +72,9 @@ def main(taskid, beams):
                 if os.path.isfile(loc + cube_name + '{}_4sig_cat.txt'.format(c)):
                     cat = ascii.read(loc + cube_name + '{}_4sig_cat.txt'.format(c))
                     print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
+                    if len(cat) > max_cat_len:
+                        print("\tMore than {} candidates: seems this cube is crap".format(max_cat_len))
+                        cat = cat[:max_cat_len]
                     hdu_mask = fits.open(loc + cube_name + '{}_4sig_mask-2d.fits'.format(c))
                     mask2d = hdu_mask[0].data[:, :]
 
