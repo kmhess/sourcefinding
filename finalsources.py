@@ -147,16 +147,22 @@ for b in beams:
                     Zmax = obj[cathead == "z_max"][0]
                     cPixXNew = int(Xc)
                     cPixYNew = int(Yc)
+                    cPixZNew = int(Zc)
                     maxX = 2 * max(abs(cPixXNew - Xmin), abs(cPixXNew - Xmax))
                     maxY = 2 * max(abs(cPixYNew - Ymin), abs(cPixYNew - Ymax))
+                    maxZ = 2 * max(abs(cPixZNew - Zmin), abs(cPixZNew - Zmax))  # Larger so I have enough pixels for rms noise calc
                     XminNew = cPixXNew - maxX
                     if XminNew < 0: XminNew = 0
                     YminNew = cPixYNew - maxY
                     if YminNew < 0: YminNew = 0
+                    ZminNew = cPixZNew - maxZ
+                    if ZminNew < 0: ZminNew = 0
                     XmaxNew = cPixXNew + maxX
                     if XmaxNew > cubeDim[2] - 1: XmaxNew = cubeDim[2] - 1
                     YmaxNew = cPixYNew + maxY
                     if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
+                    ZmaxNew = cPixZNew + maxZ
+                    if ZmaxNew > cubeDim[0] - 1: ZmaxNew = cubeDim[0] - 1
 
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
@@ -232,7 +238,9 @@ for b in beams:
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
-                            rms = np.nanstd(subcube) * chan_width.value
+                            # Calculate noise over narrower range to avoid bad spws
+                            subsubcube=subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
+                            rms = np.nanstd(subsubcube[submask == 0]) * chan_width.value
                             nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
                             print("\t1sig N_HI is {}e+19".format(nhi19))
                             nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
