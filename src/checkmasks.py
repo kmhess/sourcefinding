@@ -102,8 +102,9 @@ def main(taskid, beams):
                             ax_spec[previous + s, 0].plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                             ax_spec[previous + s, 0].set_title("Beam {:02}, Cube {}, Source {}".format(b, c, cat['col2'][s]))
                             ax_spec[previous + s, 0].set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                            if np.max(spectrum) > 10.:
-                                ax_spec[previous + s, 0].set_ylim(np.min(spectrum)*1.05, np.max(spectrum[cat['col10'][s]:cat['col11'][s]])*2)
+                            if (np.max(spectrum) > 3.) | (np.min(spectrum) < -3.):
+                                ax_spec[previous + s, 0].set_ylim(np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * -2,
+                                                                  np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
                             ax_spec[previous + s, 0].set_ylabel("Integrated Flux")
                             if previous + s == source_per_beam - 1:
                                 ax_spec[previous + s, 0].set_xlabel("Optical Velocity [km/s]")
