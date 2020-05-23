@@ -352,10 +352,9 @@ for b in beams:
                         ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                         ax_spec.set_title(src_name[-1])
                         ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                        if np.max(spectrum) > 10.:
-                            ax_spec.set_ylim(np.min(spectrum) * 1.05, np.max(spectrum[int(Zmin):int(Zmax)+1+1]) * 2)
-                        if np.max(spectrum) < -10.:
-                            ax_spec.set_ylim(np.min(spectrum[int(Zmin):int(Zmax)+1+1]) * 2, np.max(spectrum) * 1.05)
+                        if (np.max(spectrum) > 2.) | (np.min(spectrum) < -1.):
+                            ax_spec.set_ylim(np.max(spectrum[int(Zmin):int(Zmax)]) * -2,
+                                             np.max(spectrum[int(Zmin):int(Zmax)]) * 2)
                         ax_spec.set_ylabel("Integrated Flux")
                         ax_spec.set_xlabel("Optical Velocity [km/s]")
                         fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
