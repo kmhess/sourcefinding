@@ -352,7 +352,7 @@ for b in beams:
                         ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                         ax_spec.set_title(src_name[-1])
                         ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                        if (np.max(spectrum) > 2.) | (np.min(spectrum) < -2.):
+                        if (np.max(spectrum) > 2.) | (np.min(spectrum) < -1.):
                             ax_spec.set_ylim(np.max(spectrum[int(Zmin):int(Zmax)]) * -2,
                                              np.max(spectrum[int(Zmin):int(Zmax)]) * 2)
                         ax_spec.set_ylabel("Integrated Flux")
