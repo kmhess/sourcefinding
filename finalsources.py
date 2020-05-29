@@ -169,6 +169,8 @@ for b in beams:
                     freqmax = chan2freq(Zmax, hdu_pb)
                     velmax = freqmin.to(u.km/u.s, equivalencies=optical_HI).value
                     velmin = freqmax.to(u.km/u.s, equivalencies=optical_HI).value
+                    kinpa = obj[cathead == "kin_pa"][0] * u.deg
+                    rms_sofia = obj[cathead == "rms"][0]
 
                     # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
                     subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
@@ -232,38 +234,97 @@ for b in beams:
                         d2 = hdulist_opt[0].data
                         h2 = hdulist_opt[0].header
 
-                        # Make a total intensity map overlayed on optical
-                        if not os.path.isfile(new_outname + '_mom0.png'):
-                            print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
+                        # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
+                        if (not os.path.isfile(new_outname + '_mom0.png')) | (
+                        not os.path.isfile(new_outname + '_mom0hi.png')) | (
+                        not os.path.isfile(new_outname + '_signif.png')):
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
                             # Calculate noise over narrower range to avoid bad spws
-                            subsubcube=subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
+                            subsubcube = subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
                             rms = np.nanstd(subsubcube[submask == 0]) * chan_width.value
                             nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
                             print("\t1sig N_HI is {}e+19".format(nhi19))
                             nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
                                         "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
                             # Overlay HI contours on optical image
-                            fig = plt.figure(figsize=(8, 8))
-                            ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                            ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
-                            ax1.contour(hi_reprojected, cmap='Oranges', levels=[rms * 3, rms * 5, rms * 10, rms * 20,
-                                                                                rms * 40]) #, rms * 80]
-                            ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
-                                        transform=ax1.get_transform('fk5'))
-                            ax1.set_title(src_name[-1], fontsize=20)
-                            ax1.tick_params(axis='both', which='major', labelsize=18)
-                            ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
-                            ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                            ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
-                                     color='white', fontsize=18)
-                            ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
-                                                  width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
-                                                  edgecolor='white', linewidth=1))
-                            if flag != 0: plot_flags(flag, ax1)
-                            fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
+                            if not os.path.isfile(new_outname + '_mom0.png'):
+                                print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
+                                fig = plt.figure(figsize=(8, 8))
+                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
+                                ax1.contour(hi_reprojected, cmap='Oranges', linewidth=0.8,
+                                            levels=[rms * 3, rms * 5, rms * 10, rms * 20, rms * 40]) #, rms * 80]
+                                ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
+                                            transform=ax1.get_transform('fk5'))
+                                ax1.set_title(src_name[-1], fontsize=20)
+                                ax1.tick_params(axis='both', which='major', labelsize=18)
+                                ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                                ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                                ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
+                                         color='white', fontsize=18)
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
+                                                      width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
+                                                      edgecolor='white', linewidth=1))
+                                if flag != 0: plot_flags(flag, ax1)
+                                fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
+
+                            # Make HI grey scale image
+                            if not os.path.isfile(new_outname + '_mom0hi.png'):
+                                print("[FINALSOURCES] Making HI grey scale for source {}".format(
+                                    new_outname.split("/")[-1]))
+                                fig = plt.figure(figsize=(8, 8))
+                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                im = ax1.imshow(hi_reprojected, cmap='gray_r', origin='lower')
+                                ax1.contour(hi_reprojected, cmap='Oranges_r', linewidth=0.8,
+                                            levels=[rms * 3, rms * 5, rms * 10, rms * 20, rms * 40])  # , rms * 80]
+                                ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='white', linewidth=0.75,
+                                            transform=ax1.get_transform('fk5'))
+                                ax1.set_title(src_name[-1], fontsize=20)
+                                ax1.tick_params(axis='both', which='major', labelsize=18)
+                                ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                                ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                                ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
+                                         fontsize=18)
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
+                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                                      transform=ax1.transAxes, facecolor='darkorange',
+                                                      edgecolor='black', linewidth=1))
+                                if flag != 0: plot_flags(flag, ax1)
+                                cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
+                                cbar = fig.colorbar(im, cax=cb_ax)
+                                cbar.set_label("HI Intensity [Jy/beam*Hz]", fontsize=18)
+                                fig.savefig(new_outname + '_mom0hi.png', bbox_inches='tight')
+
+                            # Make HI significance image
+                            if not os.path.isfile(new_outname + '_signif.png'):
+                                hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
+                                mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
+                                significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
+                                print("[FINALSOURCES] Making HI significance image for source {}".format(new_outname.split("/")[-1]))
+                                fig = plt.figure(figsize=(8, 8))
+                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                im = ax1.imshow(significance, cmap='plasma', origin='lower')
+                                ax1.contour(significance, cmap='viridis', linewidth=0.7,
+                                            levels=[1, 2, 3, 4, 6, 8, 12])
+                                ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
+                                            transform=ax1.get_transform('fk5'))
+                                ax1.set_title(src_name[-1], fontsize=20)
+                                ax1.tick_params(axis='both', which='major', labelsize=18)
+                                ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                                ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                                ax1.text(0.5, 0.05, '1, 2, 3, 4, 6, 8 * $\Sigma$', ha='center', va='center',
+                                         transform=ax1.transAxes, fontsize=18)
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
+                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                                      transform=ax1.transAxes, facecolor='gold',
+                                                      edgecolor='indigo', linewidth=1))
+                                if flag != 0: plot_flags(flag, ax1)
+                                cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
+                                cbar = fig.colorbar(im, cax=cb_ax)
+                                cbar.set_label("Significance", fontsize=18)
+                                fig.savefig(new_outname + '_signif.png', bbox_inches='tight')
                             hdulist_hi.close()
 
                         # Make velocity map for object
@@ -281,12 +342,21 @@ for b in beams:
                             fig = plt.figure(figsize=(8, 8))
                             ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                             im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax, origin='lower')
-                            ax1.contour(mom1_reprojected, colors=['white', 'gray', 'black', 'gray', 'white'],
-                                        levels=[v_sys[-1]-100, v_sys[-1]-50, v_sys[-1], v_sys[-1]+50, v_sys[-1]+100],
-                                        linewidths=0.5)
+                            if velmax - velmin > 200:
+                                levels = [v_sys[-1] - 100, v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50, v_sys[-1] + 100]
+                                clevels = ['white', 'gray', 'black', 'gray', 'white']
+                            else:
+                                levels = [v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50]
+                                clevels = ['lightgray', 'black', 'lightgray']
+                            ax1.contour(mom1_reprojected, colors=clevels, levels=levels, linewidths=0.6)
                             # Plot HI center of galaxy
                             ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                         transform=ax1.get_transform('fk5'))
+                            ax1.plot([(hi_pos.ra + 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
+                                      (hi_pos.ra - 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg],
+                                     [(hi_pos.dec + 0.5*opt_view * np.cos(kinpa)).deg, (hi_pos.dec - 0.5*opt_view * np.cos(kinpa)).deg],
+                                     c='black', linestyle='--', linewidth=0.75, transform=ax1.get_transform('fk5'))
+                            # ax1.scatter([(hi_pos.ra + 0.6 * opt_view * np.sin(kinpa)).deg],[]
                             ax1.set_title(src_name[-1], fontsize=20)
                             ax1.tick_params(axis='both', which='major', labelsize=18)
                             ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
@@ -302,26 +372,33 @@ for b in beams:
                             cbar.set_label("Velocity [km/s]", fontsize=18)
                             fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
                             mom1.close()
-                            hdulist_opt.close()
+                        hdulist_opt.close()
                     else:
-                        print("\tWARNING: No optical image found, so no moment png's produced")
+                        print("\tWARNING: No optical image found, so no moment-related png's produced")
 
                     # Make pv plot for object
                     if not os.path.isfile(new_outname + '_pv.png'):
                         print("[FINALSOURCES] Making pv slice for source {}".format(new_outname.split("/")[-1]))
                         pv = fits.open(new_outname + '_pv.fits')
+                        wcs_pv = WCS(pv[0].header)
+                        ang1, freq1 = wcs_pv.wcs_pix2world(0, 0, 0)
+                        ang2, freq2 = wcs_pv.wcs_pix2world(pv[0].header['NAXIS1'], pv[0].header['NAXIS2'], 0)
                         pv_rms = np.nanstd(pv[0].data)
-                        # pvfile = SpectralCube.read(new_outname + '_{}_pv.fits')
-                        # pv = mom1file.with_spectral_unit(u.km / u.s, velocity_convention='optical',
-                        #                                  rest_value=1.420405752 * u.GHz)
                         fig = plt.figure(figsize=(8, 8))
                         ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
-                        im = ax1.imshow(pv[0].data, cmap='gray')
+                        ax1.imshow(pv[0].data, cmap='gray')
                         ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
+                        ax1.autoscale(False)
+                        ax1.plot([0.0, 0.0], [freq1, freq2], c='orange', linestyle='--', linewidth=0.75,
+                                 transform=ax1.get_transform('world'))
+                        ax1.plot([ang1, ang2], [freq_sys.value, freq_sys.value], c='orange', linestyle='--',
+                                 linewidth=0.75, transform=ax1.get_transform('world'))
                         ax1.set_title(src_name[-1], fontsize=16)
                         ax1.tick_params(axis='both', which='major', labelsize=18)
                         ax1.set_xlabel('Angular Offset', fontsize=16)
                         ax1.set_ylabel('Frequency', fontsize=16)
+                        ax1.text(0.5, 0.05, 'Kinematic PA = {:5.1f} deg'.format(kinpa.value), ha='center', va='center',
+                                 transform=ax1.transAxes, color='white', fontsize=18)
                         fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
                         pv.close()
 
@@ -340,6 +417,7 @@ for b in beams:
                     # Make spectrum plot:
                     if not os.path.isfile(new_outname + '_specfull.png'):
                         print("[FINALSOURCES] Making HI spectrum plot for source {}".format(new_outname.split("/")[-1]))
+                        spectrumJy = spectrum / pix_per_beam
                         cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
                         optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
                         maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
@@ -347,17 +425,33 @@ for b in beams:
                         fig = plt.figure(figsize=(15, 4))
                         ax_spec = fig.add_subplot(111)
                         ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
-                        ax_spec.plot(optical_velocity, spectrum)
-                        ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                        ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                        ax_spec.plot(optical_velocity, spectrumJy)
+                        ax_spec.plot([maskmin, maskmin], [np.nanmin(spectrumJy), np.nanmax(spectrumJy)], ':', color='gray')
+                        ax_spec.plot([maskmax, maskmax], [np.nanmin(spectrumJy), np.nanmax(spectrumJy)], ':', color='gray')
                         ax_spec.set_title(src_name[-1])
                         ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                        if (np.max(spectrum) > 2.) | (np.min(spectrum) < -1.):
-                            ax_spec.set_ylim(np.max(spectrum[int(Zmin):int(Zmax)]) * -2,
-                                             np.max(spectrum[int(Zmin):int(Zmax)]) * 2)
-                        ax_spec.set_ylabel("Integrated Flux")
+                        if (np.max(spectrumJy) > 2.) | (np.min(spectrumJy) < -1.):
+                            ax_spec.set_ylim(np.max(spectrumJy[int(Zmin):int(Zmax)]) * -2,
+                                             np.max(spectrumJy[int(Zmin):int(Zmax)]) * 2)
+                        ax_spec.set_ylabel("Integrated Flux [Jy]")
                         ax_spec.set_xlabel("Optical Velocity [km/s]")
                         fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
+
+                    # Make SoFiA spectrum plot (no noise):
+                    if not os.path.isfile(new_outname + '_spec.png'):
+                        print("[FINALSOURCES] Making HI SoFiA spectrum plot for source {}".format(new_outname.split("/")[-1]))
+                        spec = ascii.read(new_outname + '_spec.txt', names=['Chan', 'Spectral', 'Sum', 'Npix'])
+                        optical_velocity = (spec['Spectral'] * u.Hz).to(u.km / u.s, equivalencies=optical_HI)
+                        fig = plt.figure(figsize=(8, 4))
+                        ax_spec = fig.add_subplot(111)
+                        ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
+                        ax_spec.errorbar(optical_velocity[:].value, spec['Sum']/pix_per_beam, elinewidth=0.75,
+                                         yerr=rms_sofia*np.sqrt(spec['Npix']/pix_per_beam), capsize=1)
+                        ax_spec.set_title(src_name[-1])
+                        ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
+                        ax_spec.set_ylabel("Integrated Flux [Jy]")
+                        ax_spec.set_xlabel("Optical Velocity [km/s]")
+                        fig.savefig(new_outname + '_spec.png', bbox_inches='tight')
 
                     plt.close('all')
 
