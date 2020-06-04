@@ -5,12 +5,17 @@ import os
 from modules.functions import *
 
 from argparse import ArgumentParser, RawTextHelpFormatter
-from astropy.io import ascii, fits
+from astropy.io import ascii
+from astropy.io import fits as pyfits
 from astropy.convolution import convolve, Box1DKernel
 from astropy import units as u
 from cosmocalc import cosmocalc
 import matplotlib.pyplot as plt
 import numpy as np
+
+from apercal.libs import lib
+from apercal.subs import managefiles
+import apercal
 
 
 ###################################################################
@@ -21,6 +26,14 @@ parser = ArgumentParser(description="Do source finding in the HI spectral line c
 parser.add_argument('-s', '--sourcename', default='AHCJ110246.9+591036_191003042_36_2_1',
                     help='Specify full AHC name of source to plot.  (default: %(default)s).')
 
+parser.add_argument('-m', '--move_mask',
+                    help='If included, move mask for 1667 to clean 1665 & recreate ALL cubes with *_oh appended.',
+                    action='store_true')
+
+parser.add_argument('-o', "--overwrite",
+                    help="If option is included, overwrite old clean, model, and residual FITS files.",
+                    action='store_true')
+
 ###################################################################
 
 # Parse the arguments above
@@ -28,6 +41,7 @@ args = parser.parse_args()
 name, taskid, b, c, s = args.sourcename.split("_")
 b, c, s = int(b), int(c), int(s)
 cube_name = 'HI_image_cube'
+beam_name = 'HI_beam_cube'
 alta_dir = '/altaZone/archive/apertif_main/visibilities_default/'
 
 '''The ground state A-doublet (there are a total of four substates due to hyperfine splitting) 
@@ -64,7 +78,7 @@ f2_obs = fhi_rest / (oh_candidate['redshift'] + 1)
 z = f2_rest/f2_obs - 1
 cosmo = cosmocalc(z[0], H0)
 DL = cosmo['DL_Mpc'] * u.Mpc
-print("\tz = {};  DL_Mpc = {}".format(z,DL))
+print("\tz = {};  DL_Mpc = {}".format(z, DL))
 
 f1_extrap = f1_rest / (z + 1)
 f3_extrap = f3_rest / (z + 1)
@@ -78,19 +92,148 @@ print("\tIf line is 1667 MHz OH line, then redshifted lines are: ")
 print("\t\tF(1665)obs = {}\tF(1612)obs = {}\tF(1720)obs = {}".format(f1_extrap, f3_extrap, f4_extrap))
 print("\t\tF(HI)obs = {}\tF(CO)obs = {}\tF(HCN)obs = {}, {}".format(fhi_extrap, fco_extrap, fhcn1_extrap, fhcn2_extrap))
 
+if args.move_mask:
+    if (not os.path.isfile('{}{}{}_4sig_maskoh.fits'.format(loc, cube_name, c))) | \
+            (not os.path.isfile('{}{}{}_clean_oh_cbcor.fits'.format(loc, cube_name, c))):
+        print("[PLOT_OHMASER_SPEC] Copying old mask to new file, and shifting mask to 1665 MHz emission")
+        os.system('cp {}{}{}_4sig_mask.fits {}{}{}_4sig_mask_oh.fits'.format(loc, cube_name, c, loc, cube_name, c))
+        mask_cube = '{}{}{}_4sig_mask_oh.fits'.format(loc, cube_name, c)
+        # Edit mask cube to include 1665 MHz emission
+        m = pyfits.open(mask_cube, mode='update')
+        mdata = m[0].data
+        mshape = m[0].data.shape
+        new_src_num = np.max(mdata) + 1
+        diff1665 = np.int(np.round((f2_obs - f1_extrap).to(u.Hz) / (m[0].header['CDELT3'] * u.Hz)))
+        indices = np.where(mdata != 0)
+        for i in range(len(indices[0])):
+            if (indices[0][i] >= diff1665) & (mdata[indices[0][i], indices[1][i], indices[2][i]] == s) & \
+                    (mdata[indices[0][i]-diff1665, indices[1][i], indices[2][i]] < 1):
+                mdata[indices[0][i] - diff1665, indices[1][i], indices[2][i]] = new_src_num
+        m[0].data = mdata
+        m[0].scale('int16')
+        m.flush()
+        print("[PLOT_OHMASER_SPEC] Cleaning 1665 MHz emission")
+
+        print("[PLOT_OHMASER_SPEC] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
+        filter_cube = loc + cube_name + '{0}_filtered.fits'.format(c)
+        f = pyfits.open(filter_cube)
+        mask = np.ones(f[0].data.shape[0], dtype=bool)
+        if c == 3: mask[376:662] = False
+        lineimagestats = [np.nanmin(f[0].data[mask]), np.nanmax(f[0].data[mask]), np.nanstd(f[0].data[mask])]
+        f.close()
+        print("\tImage min, max, std: {}".format(lineimagestats[:]))
+
+        # Change to the taskid/beam directory because of the way the clean script works.
+        # (Rest of script should be okay b/c paths are explicit.)
+        prepare = apercal.prepare()
+        managefiles.director(prepare, 'ch', loc)
+        # Delete any pre-existing Miriad files.
+        os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+
+        print("[PLOT_OHMASER_SPEC] Reading in FITS files, making Miriad mask.")
+
+        line_cube = cube_name + '{0}.fits'.format(c)
+        beam_cube = beam_name + '{0}.fits'.format(c)
+        mask_cube = cube_name + '{0}_4sig_mask_oh.fits'.format(c)
+        mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.eq.' + \
+                    ').or.(<mask_sofia>.eq.'.join([str(s), str(new_src_num)]) + ')"'
+
+        fits = lib.miriad('fits')
+        fits.op = 'xyin'
+        fits.in_ = line_cube
+        fits.out = 'map_00'
+        fits.go()
+
+        if not os.path.isfile(beam_cube):
+            print("[PLOT_OHMASER_SPEC] Retrieving synthesized beam cube from ALTA.")
+            os.system('iget {}{}_AP_B0{:02}/HI_beam_cube{}.fits {}'.format(alta_dir, taskid, b, c, loc))
+        fits.in_ = beam_cube
+        fits.out = 'beam_00'
+        fits.go()
+
+        # Work with mask_sofia in current directory...otherwise worried about miriad character length for mask_expr
+        fits.in_ = mask_cube
+        fits.out = 'mask_sofia'
+        fits.go()
+
+        maths = lib.miriad('maths')
+        maths.out = 'mask_00'
+        maths.exp = '"<mask_sofia>"'
+        maths.mask = mask_expr
+        maths.go()
+
+        nminiter = 1
+        for minc in range(nminiter):
+            print("Continuing where I left off")
+            print("[PLOT_OHMASER_SPEC] Cleaning OH emission using SoFiA mask for Sources {}.".format(s))
+            clean = lib.miriad('clean')
+            clean.map = 'map_' + str(minc).zfill(2)
+            clean.beam = 'beam_' + str(minc).zfill(2)
+            clean.out = 'model_' + str(minc + 1).zfill(2)
+            clean.cutoff = lineimagestats[2] * 0.5
+            clean.region = '"' + 'mask(mask_' + str(minc).zfill(2) + '/)"'
+            clean.go()
+
+            print("[PLOT_OHMASER_SPEC] Restoring line cube.")
+            restor = lib.miriad('restor')  # Create the restored image
+            restor.model = 'model_' + str(minc + 1).zfill(2)
+            restor.beam = 'beam_' + str(minc).zfill(2)
+            restor.map = 'map_' + str(minc).zfill(2)
+            restor.out = 'image_' + str(minc + 1).zfill(2)
+            restor.mode = 'clean'
+            restor.go()
+
+            # print("[PLOT_OHMASER_SPEC] Making residual cube.")
+            # restor.mode = 'residual'  # Create the residual image
+            # restor.out = loc + 'residual_' + str(minc + 1).zfill(2)
+            # restor.go()
+
+        if args.overwrite:
+            os.system('rm {}_clean_oh.fits {}_residual_oh.fits {}_model_oh.fits'.format(line_cube[:-5], line_cube[:-5],
+                                                                                        line_cube[:-5]))
+
+        print("[PLOT_OHMASER_SPEC] Writing out cleaned image, residual, and model to FITS.")
+        fits.op = 'xyout'
+        fits.in_ = 'image_' + str(minc + 1).zfill(2)
+        fits.out = line_cube[:-5] + '_clean_oh.fits'
+        fits.go()
+
+        # fits.in_ = loc + 'residual_' + str(minc + 1).zfill(2)
+        # fits.out = line_cube[:-5] + '_residual_oh.fits'
+        # fits.go()
+
+        fits.in_ = loc + 'model_' + str(minc + 1).zfill(2)
+        fits.out = line_cube[:-5] + '_model_oh.fits'
+        fits.go()
+
+        # Clean up extra Miriad files
+        os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+
+        print("[PLOT_OHMASER_SPEC] Creating CB corrected cube for cleaned 1665 MHz emission.")
+        hdu_clean = pyfits.open(loc + cube_name + '{}_clean_oh.fits'.format(c))
+        pbcor(taskid, loc + cube_name + '{}_clean_oh.fits'.format(c), hdu_clean, b, c)
+        hdu_clean.close()
+
+    else:
+        print("\tMask including 1665 MHz emission exists: going to assume cleaning already done!!")
+
 print("[PLOT_OHMASER_SPEC] Grab the 1612 MHz data.")
 
 for c2 in [3, 2, 1, 0]:
     if not os.path.isfile(loc + cube_name + '{}.fits'.format(c2)):
         print("[PLOT_OHMASER_SPEC] Retrieving image cube{} from ALTA.".format(c2))
         os.system('iget {}{}_AP_B0{:02}/HI_image_cube{}.fits {}'.format(alta_dir, taskid, b, c2, loc))
-    header = fits.getheader(loc + cube_name + '{}.fits'.format(c2))
+    header = pyfits.getheader(loc + cube_name + '{}.fits'.format(c2))
     f1 = header['CRVAL3'] * u.Hz
     f2 = (header['CRVAL3'] + header['CDELT3'] * header['NAXIS3']) * u.Hz
     if (f3_extrap > f1) & (f3_extrap < f2):
         print("\tF(1612)obs line in Cube {}".format(c2))
         break
 
+# Read in the dirty data covering 1612 MHz line:
+hdu_dirty_1612 = pyfits.open(loc + cube_name + '{}.fits'.format(c2))
+
+# Lines stolen from SoFiA and kept in same format so I don't have to troubleshoot (it's ugly tho)
 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
 objects = []
 for source in oh_candidate:
@@ -100,65 +243,81 @@ for source in oh_candidate:
     objects.append(obj[1:])
 objects = np.array(objects)
 
-# Read in the dirty data covering 1612 MHz line and SoFiA mask from the 1667 MHz cube:
-hdu_dirty = fits.open(loc + cube_name + '{}.fits'.format(c2))
+obj = objects[0]
+cubeDim = hdu_dirty_1612[0].data.shape
+Xc = obj[cathead == "x"][0]
+Yc = obj[cathead == "y"][0]
+Zc = obj[cathead == "z"][0]
+Xmin = obj[cathead == "x_min"][0]
+Ymin = obj[cathead == "y_min"][0]
+Xmax = obj[cathead == "x_max"][0]
+Ymax = obj[cathead == "y_max"][0]
+cPixXNew = int(Xc)
+cPixYNew = int(Yc)
+maxX = 2 * max(abs(cPixXNew - Xmin), abs(cPixXNew - Xmax))
+maxY = 2 * max(abs(cPixYNew - Ymin), abs(cPixYNew - Ymax))
+XminNew = cPixXNew - maxX
+if XminNew < 0: XminNew = 0
+YminNew = cPixYNew - maxY
+if YminNew < 0: YminNew = 0
+XmaxNew = cPixXNew + maxX
+if XmaxNew > cubeDim[2] - 1: XmaxNew = cubeDim[2] - 1
+YmaxNew = cPixYNew + maxY
+if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
-pbcor(taskid, loc + cube_name + '{}.fits'.format(c2), hdu_dirty, b, c2)
-hdu_pb = pyfits.open(loc + cube_name + '{}_cbcor.fits'.format(c2))
-
-hi_cellsize = hdu_dirty[0].header['CDELT2'] * 3600. * u.arcsec
-# pix_per_beam = bmaj/hi_cellsize * bmin/hi_cellsize * np.pi / (4 * np.log(2))
-chan_width = hdu_dirty[0].header['CDELT3'] * u.Hz
-
-# Make HI profiles with noise over whole cube by squashing 3D mask:
-cube_frequencies = chan2freq(np.array(range(hdu_dirty[0].data.shape[0])), hdu=hdu_dirty)
-
-for obj in objects:
-    # Some lines stolen from cubelets in  SoFiA:
-    cubeDim = hdu_dirty[0].data.shape
-    Xc = obj[cathead == "x"][0]
-    Yc = obj[cathead == "y"][0]
-    Zc = obj[cathead == "z"][0]
-    Xmin = obj[cathead == "x_min"][0]
-    Ymin = obj[cathead == "y_min"][0]
-    Xmax = obj[cathead == "x_max"][0]
-    Ymax = obj[cathead == "y_max"][0]
-    cPixXNew = int(Xc)
-    cPixYNew = int(Yc)
-    maxX = 2 * max(abs(cPixXNew - Xmin), abs(cPixXNew - Xmax))
-    maxY = 2 * max(abs(cPixYNew - Ymin), abs(cPixYNew - Ymax))
-    XminNew = cPixXNew - maxX
-    if XminNew < 0: XminNew = 0
-    YminNew = cPixYNew - maxY
-    if YminNew < 0: YminNew = 0
-    XmaxNew = cPixXNew + maxX
-    if XmaxNew > cubeDim[2] - 1: XmaxNew = cubeDim[2] - 1
-    YmaxNew = cPixYNew + maxY
-    if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
-
-    # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
+if args.move_mask:
+    print("[PLOT_OHMASER_SPEC] Creating *_oh_specfull.txt file including cleaned 1665 MHz emission.")
+    hdu_pb = pyfits.open(loc + cube_name + '{}_clean_oh_cbcor.fits'.format(c))
     subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
-    submask = fits.getdata(loc + args.sourcename + '_mask.fits'.format(int(obj[0])))
-    # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
+    submask = pyfits.getdata(loc + args.sourcename + '_mask.fits'.format(int(obj[0])))
     mask2d = np.sum(submask, axis=0)
 
-    # Calculate spectrum and some fundamental galaxy parameters
     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
-    specmask = np.zeros(len(spectrum))
+    cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
+    bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
+    bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
+    hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
 
-    new_outname = loc + args.sourcename + '_1612'
+    ascii.write([cube_frequencies, spectrum], loc + args.sourcename + '_oh_specfull.txt',
+                names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+    os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                   hi_cellsize))
+    os.system('cat temp ' + loc + args.sourcename + '_oh_specfull.txt' +
+              ' > temp2 && mv temp2 ' + loc + args.sourcename + '_oh_specfull.txt')
+    os.system('rm temp')
+    hdu_pb.close()
 
-    if not os.path.isfile(new_outname + '_specfull.txt'):
-        print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname.split("/")[-1]))
-        ascii.write([cube_frequencies, spectrum], new_outname + '_specfull.txt',
-                    names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+# Read in the dirty data covering 1612 MHz line and SoFiA mask from the 1667 MHz cube:
+pbcor(taskid, loc + cube_name + '{}.fits'.format(c2), hdu_dirty_1612, b, c2)
+hdu_pb_1612 = pyfits.open(loc + cube_name + '{}_cbcor.fits'.format(c2))
+hdu_dirty_1612.close()
 
-hdu_dirty.close()
-hdu_pb.close()
+# Same for both 1612 and 1667 MHz cubes (unless detected in cube 3...let's not deal with that now.)
+hi_cellsize = hdu_dirty_1612[0].header['CDELT2'] * 3600. * u.arcsec
+chan_width = hdu_dirty_1612[0].header['CDELT3'] * u.Hz
+
+# Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
+subcube_1612 = hdu_pb_1612[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+spectrum_1612 = np.nansum(subcube_1612[:, mask2d != 0], axis=1)
+cube_frequencies = chan2freq(np.array(range(hdu_pb_1612[0].data.shape[0])), hdu=hdu_pb_1612)
+
+new_outname = loc + args.sourcename + '_1612'
+
+if not os.path.isfile(new_outname + '_specfull.txt'):
+    print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname.split("/")[-1]))
+    ascii.write([cube_frequencies, spectrum_1612], new_outname + '_specfull.txt',
+                names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+
+hdu_dirty_1612.close()
+hdu_pb_1612.close()
 
 if not os.path.isfile(new_outname + '_ohmaser_spec.png'):
     print("[PLOT_OHMASER_SPEC] Read in the spectra.")
-    spec = ascii.read(loc + args.sourcename + '_specfull.txt')
+    if os.path.isfile(loc + args.sourcename + '_oh_specfull.txt'):
+        spec = ascii.read(loc + args.sourcename + '_oh_specfull.txt')
+    else:
+        print("\tWARNING: 1665 MHz may not have been cleaned!!")
+        spec = ascii.read(loc + args.sourcename + '_specfull.txt')
     spec1612 = ascii.read(new_outname + '_specfull.txt')
     beam_info = spec.meta['comments']
     print("\t", beam_info)
