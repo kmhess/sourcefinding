@@ -31,7 +31,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	hdulist_cb = pyfits.open(cb_model)
 	hdulist_cb[0].header['CRVAL1'] = hdu_image[0].header['CRVAL1']
 	hdulist_cb[0].header['CRVAL2'] = hdu_image[0].header['CRVAL2']
-	cb2d_name = '{}_cb-2d.fits'.format(image_name[:-11])
+	cb2d_name = 'temp_b{}_c{}_cb-2d.fits'.format(b, c)
 	hdulist_cb.writeto(cb2d_name)
 	hdulist_cb.close()
 
