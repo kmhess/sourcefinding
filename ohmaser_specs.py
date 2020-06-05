@@ -328,15 +328,19 @@ else:
         os.system('rm temp')
         hdu_pb.close()
 
-
 # If dirty cb corrected 1612 MHz doesn't exist, make it.
 if not os.path.isfile(loc + cube_name + '{}_cbcor.fits'.format(c2)):
     pbcor(taskid, loc + cube_name + '{}.fits'.format(c2), hdu_dirty_1612, b, c2)
+hdu_dirty_1612.close()
 
 # Same for both 1612 and 1667 MHz cubes (unless detected in cube 3...let's not deal with that now.)
-hi_cellsize = hdu_dirty_1612[0].header['CDELT2'] * 3600. * u.arcsec
-chan_width = hdu_dirty_1612[0].header['CDELT3'] * u.Hz
-hdu_dirty_1612.close()
+hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
+bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
+bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
+pix_per_beam = bmaj / hi_cellsize * bmin / hi_cellsize * np.pi / (4 * np.log(2))
+chan_width = hdu_pb[0].header['CDELT3'] * u.Hz
+hdu_pb.close()
 new_outname = loc + args.sourcename + '_1612'
 
 # If spectrum files fo 1612 MHz line don't exist yet, make them
@@ -381,21 +385,24 @@ box_kernel = Box1DKernel(smochan[0])
 smoothed_data_box = convolve(np.asfarray(spec['Flux [Jy/beam*pixel]']), box_kernel)
 fig, ax = plt.subplots(2, 1, figsize=(15, 8))
 ax[0].plot([spec[0][0], spec[-1][0]], [0, 0], c='gray', linestyle='--')
-ax[0].plot(spec['Frequency [Hz]'], smoothed_data_box, label='')
+ax[0].plot(spec['Frequency [Hz]'], smoothed_data_box/pix_per_beam, label='')
 ax[0].set_xlim(spec[0][0], spec[-1][0])
-ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.667 GHz')
-ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.665 GHz')
+ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.01, 0.03], linestyle='--', label='1.667 GHz')
+ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.01, 0.03], linestyle='--', label='1.665 GHz')
 ax[0].legend()
 ax[0].text(0.02, 0.8, 'Boxcar smoothed by {} channels'.format(smochan[0]), transform=ax[0].transAxes)
 ax[0].text(0.05, 0.9, 'z={:9.6f}'.format(z[0]), transform=ax[0].transAxes)
+ax[0].set_ylabel("Integrated Flux [Jy]")
 box_kernel = Box1DKernel(smochan[1])
 smoothed_data_box = convolve(np.asfarray(spec1612['Flux [Jy/beam*pixel]']), box_kernel)
 ax[1].plot([spec1612[0][0], spec1612[-1][0]], [0, 0], c='gray', linestyle='--')
-ax[1].plot(spec1612['Frequency [Hz]'], smoothed_data_box, label='')
+ax[1].plot(spec1612['Frequency [Hz]'], smoothed_data_box/pix_per_beam, label='')
 ax[1].set_xlim(spec1612[0][0], spec1612[-1][0])
-ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.1, 0.1], linestyle='--', label='1.612 GHz', c='red')
+ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.01, 0.01], linestyle='--', label='1.612 GHz', c='red')
 ax[1].legend()
 ax[1].text(0.02, 0.9, 'Boxcar smoothed by {} channels'.format(smochan[1]), transform=ax[1].transAxes)
+ax[1].set_ylabel("Integrated Flux [Jy]")
+ax[1].set_xlabel("Observed Frequency [Hz]")
 plt.savefig(loc + args.sourcename + '_ohmaser_spec.png', bbox_inches='tight')
 
 box_kernel = Box1DKernel(smochan[0])
@@ -404,11 +411,12 @@ fig, ax = plt.subplots(2, 1, figsize=(15, 8))
 ax[0].plot([pix_spec[0][0], pix_spec[-1][0]], [0, 0], c='gray', linestyle='--')
 ax[0].plot(pix_spec['Frequency [Hz]'], smoothed_data_box, label='')
 ax[0].set_xlim(pix_spec[0][0], pix_spec[-1][0])
-ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.005, 0.020], linestyle='--', label='1.667 GHz')
-ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.005, 0.020], linestyle='--', label='1.665 GHz')
+ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.005, 0.019], linestyle='--', label='1.667 GHz')
+ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.005, 0.019], linestyle='--', label='1.665 GHz')
 ax[0].legend()
 ax[0].text(0.02, 0.8, 'Boxcar smoothed by {} channels'.format(smochan[0]), transform=ax[0].transAxes)
 ax[0].text(0.05, 0.9, 'z={:9.6f}'.format(z[0]), transform=ax[0].transAxes)
+ax[0].set_ylabel("Peak Flux [Jy/beam]")
 box_kernel = Box1DKernel(smochan[1])
 smoothed_data_box = convolve(np.asfarray(pix_spec1612['Flux [Jy/beam*pixel]']), box_kernel)
 ax[1].plot([pix_spec1612[0][0], pix_spec1612[-1][0]], [0, 0], c='gray', linestyle='--')
@@ -419,4 +427,6 @@ ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.004, 0.004]
            linestyle='--', label='1.612 GHz', c='red')
 ax[1].legend()
 ax[1].text(0.02, 0.9, 'Boxcar smoothed by {} channels'.format(smochan[1]), transform=ax[1].transAxes)
+ax[1].set_ylabel("Peak Flux [Jy/beam]")
+ax[0].set_xlabel("Observed Frequency [Hz]")
 plt.savefig(loc + args.sourcename + '_ohmaser_pix_spec.png', bbox_inches='tight')
