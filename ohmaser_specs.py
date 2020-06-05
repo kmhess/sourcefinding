@@ -9,6 +9,7 @@ from astropy.io import ascii
 from astropy.io import fits as pyfits
 from astropy.convolution import convolve, Box1DKernel
 from astropy import units as u
+from astropy.wcs import WCS
 from cosmocalc import cosmocalc
 import matplotlib.pyplot as plt
 import numpy as np
@@ -80,6 +81,7 @@ cosmo = cosmocalc(z[0], H0)
 DL = cosmo['DL_Mpc'] * u.Mpc
 print("\tz = {};  DL_Mpc = {}".format(z, DL))
 
+# Calculate the new redshifed frequencies for interesting lines.
 f1_extrap = f1_rest / (z + 1)
 f3_extrap = f3_rest / (z + 1)
 f4_extrap = f4_rest / (z + 1)
@@ -92,8 +94,9 @@ print("\tIf line is 1667 MHz OH line, then redshifted lines are: ")
 print("\t\tF(1665)obs = {}\tF(1612)obs = {}\tF(1720)obs = {}".format(f1_extrap, f3_extrap, f4_extrap))
 print("\t\tF(HI)obs = {}\tF(CO)obs = {}\tF(HCN)obs = {}, {}".format(fhi_extrap, fco_extrap, fhcn1_extrap, fhcn2_extrap))
 
+# If SoFiA didn't catch the 1665 line, shift the mask for 1667 to the right velocity, add to old mask and re-clean the dirty cube
 if args.move_mask:
-    if (not os.path.isfile('{}{}{}_4sig_maskoh.fits'.format(loc, cube_name, c))) | \
+    if (not os.path.isfile('{}{}{}_4sig_mask_oh.fits'.format(loc, cube_name, c))) | \
             (not os.path.isfile('{}{}{}_clean_oh_cbcor.fits'.format(loc, cube_name, c))):
         print("[PLOT_OHMASER_SPEC] Copying old mask to new file, and shifting mask to 1665 MHz emission")
         os.system('cp {}{}{}_4sig_mask.fits {}{}{}_4sig_mask_oh.fits'.format(loc, cube_name, c, loc, cube_name, c))
@@ -219,6 +222,7 @@ if args.move_mask:
 
 print("[PLOT_OHMASER_SPEC] Grab the 1612 MHz data.")
 
+# Given the observed frequency of 1667 MHz line, find cube where 1612 line should be
 for c2 in [3, 2, 1, 0]:
     if not os.path.isfile(loc + cube_name + '{}.fits'.format(c2)):
         print("[PLOT_OHMASER_SPEC] Retrieving image cube{} from ALTA.".format(c2))
@@ -265,82 +269,154 @@ if XmaxNew > cubeDim[2] - 1: XmaxNew = cubeDim[2] - 1
 YmaxNew = cPixYNew + maxY
 if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
 
+submask = pyfits.getdata(loc + args.sourcename + '_mask.fits'.format(int(obj[0])))
+mask2d = np.sum(submask, axis=0)
+
+# Create new spectrum files from cleaned data if 1665 MHz line wasn't previously covered
 if args.move_mask:
-    print("[PLOT_OHMASER_SPEC] Creating *_oh_specfull.txt file including cleaned 1665 MHz emission.")
-    hdu_pb = pyfits.open(loc + cube_name + '{}_clean_oh_cbcor.fits'.format(c))
-    subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
-    submask = pyfits.getdata(loc + args.sourcename + '_mask.fits'.format(int(obj[0])))
-    mask2d = np.sum(submask, axis=0)
+    # Make spectrum file based on sum within the mask
+    if not os.path.isfile(loc + args.sourcename + '_oh_specfull.txt'):
+        print("[PLOT_OHMASER_SPEC] Creating *_oh_specfull.txt file including cleaned 1665 MHz emission.")
+        hdu_pb = pyfits.open(loc + cube_name + '{}_clean_oh_cbcor.fits'.format(c))
+        subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+        spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
+        cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
+        bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
+        bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
+        hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
+        ascii.write([cube_frequencies, spectrum], loc + args.sourcename + '_oh_specfull.txt',
+                    names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                       hi_cellsize))
+        os.system('cat temp ' + loc + args.sourcename + '_oh_specfull.txt' +
+                  ' > temp2 && mv temp2 ' + loc + args.sourcename + '_oh_specfull.txt')
+        os.system('rm temp')
+        hdu_pb.close()
+    # Make spectrum file based on central pixel of source
+    if not os.path.isfile(loc + args.sourcename + '_oh_pix_specfull.txt'):
+        print("[PLOT_OHMASER_SPEC] Creating *_oh_pix_specfull.txt file including cleaned 1665 MHz emission.")
+        hdu_pb = pyfits.open(loc + cube_name + '{}_clean_oh_cbcor.fits'.format(c))
+        pix_spec = hdu_pb[0].data[:, int(Yc), int(Xc)]
+        cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
+        bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
+        bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
+        hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
+        ascii.write([cube_frequencies, pix_spec], loc + args.sourcename + '_oh_pix_specfull.txt',
+                    names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                       hi_cellsize))
+        os.system('cat temp ' + loc + args.sourcename + '_oh_pix_specfull.txt' +
+                  ' > temp2 && mv temp2 ' + loc + args.sourcename + '_oh_pix_specfull.txt')
+        os.system('rm temp')
+        hdu_pb.close()
+else:
+    print("\tNo extra cleaning necessary, so getting pixel spectrum from original CB corrected file")
+    if not os.path.isfile(loc + args.sourcename + '_pix_specfull.txt'):
+        print("[PLOT_OHMASER_SPEC] Creating *_pix_specfull.txt file from original CB corrected file.")
+        hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+        pix_spec = hdu_pb[0].data[:, int(Yc), int(Xc)]
+        cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
+        bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
+        bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
+        hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
+        ascii.write([cube_frequencies, pix_spec], loc + args.sourcename + '_pix_specfull.txt',
+                    names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                                                                                       hi_cellsize))
+        os.system('cat temp ' + loc + args.sourcename + '_oh_specfull.txt' +
+                  ' > temp2 && mv temp2 ' + loc + args.sourcename + '_oh_pix_specfull.txt')
+        os.system('rm temp')
+        hdu_pb.close()
 
-    spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
-    cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
-    bmaj = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
-    bmin = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
-    hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
 
-    ascii.write([cube_frequencies, spectrum], loc + args.sourcename + '_oh_specfull.txt',
-                names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
-    os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
-                                                                                   hi_cellsize))
-    os.system('cat temp ' + loc + args.sourcename + '_oh_specfull.txt' +
-              ' > temp2 && mv temp2 ' + loc + args.sourcename + '_oh_specfull.txt')
-    os.system('rm temp')
-    hdu_pb.close()
-
-# Read in the dirty data covering 1612 MHz line and SoFiA mask from the 1667 MHz cube:
-pbcor(taskid, loc + cube_name + '{}.fits'.format(c2), hdu_dirty_1612, b, c2)
-hdu_pb_1612 = pyfits.open(loc + cube_name + '{}_cbcor.fits'.format(c2))
-hdu_dirty_1612.close()
+# If dirty cb corrected 1612 MHz doesn't exist, make it.
+if not os.path.isfile(loc + cube_name + '{}_cbcor.fits'.format(c2)):
+    pbcor(taskid, loc + cube_name + '{}.fits'.format(c2), hdu_dirty_1612, b, c2)
 
 # Same for both 1612 and 1667 MHz cubes (unless detected in cube 3...let's not deal with that now.)
 hi_cellsize = hdu_dirty_1612[0].header['CDELT2'] * 3600. * u.arcsec
 chan_width = hdu_dirty_1612[0].header['CDELT3'] * u.Hz
-
-# Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
-subcube_1612 = hdu_pb_1612[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
-spectrum_1612 = np.nansum(subcube_1612[:, mask2d != 0], axis=1)
-cube_frequencies = chan2freq(np.array(range(hdu_pb_1612[0].data.shape[0])), hdu=hdu_pb_1612)
-
+hdu_dirty_1612.close()
 new_outname = loc + args.sourcename + '_1612'
 
+# If spectrum files fo 1612 MHz line don't exist yet, make them
 if not os.path.isfile(new_outname + '_specfull.txt'):
-    print("[FINALSOURCES] Making HI spectrum text file for source {}".format(new_outname.split("/")[-1]))
+    print("[PLOT_OHMASER_SPEC] Creating *_1612_specfull.txt file integrated over 2d mask")
+    hdu_pb_1612 = pyfits.open(loc + cube_name + '{}_cbcor.fits'.format(c2))
+    # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
+    subcube_1612 = hdu_pb_1612[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+    spectrum_1612 = np.nansum(subcube_1612[:, mask2d != 0], axis=1)
+    cube_frequencies = chan2freq(np.array(range(hdu_pb_1612[0].data.shape[0])), hdu=hdu_pb_1612)
     ascii.write([cube_frequencies, spectrum_1612], new_outname + '_specfull.txt',
                 names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+    hdu_pb_1612.close()
+if not os.path.isfile(new_outname + '_pix_specfull.txt'):
+    print("[PLOT_OHMASER_SPEC] Creating *_1612_pix_specfull.txt file through single pixel")
+    hdu_pb_1612 = pyfits.open(loc + cube_name + '{}_cbcor.fits'.format(c2))
+    pix_spec_1612 = hdu_pb_1612[0].data[:, int(Yc), int(Xc)]
+    cube_frequencies = chan2freq(np.array(range(hdu_pb_1612[0].data.shape[0])), hdu=hdu_pb_1612)
+    ascii.write([cube_frequencies, pix_spec_1612], new_outname + '_pix_specfull.txt',
+                names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
+    hdu_pb_1612.close()
 
-hdu_dirty_1612.close()
-hdu_pb_1612.close()
+# MAKE SOME PLOTS! (Always remake them--it's fast)  CHANGE THIS LATER?
+# if not os.path.isfile(new_outname + '_ohmaser_spec.png'):
+print("[PLOT_OHMASER_SPEC] Read in the spectra.")
+if os.path.isfile(loc + args.sourcename + '_oh_specfull.txt'):
+    spec = ascii.read(loc + args.sourcename + '_oh_specfull.txt')
+    pix_spec = ascii.read(loc + args.sourcename + '_oh_pix_specfull.txt')
+else:
+    print("\tWARNING: 1665 MHz may not have been cleaned!!")
+    spec = ascii.read(loc + args.sourcename + '_specfull.txt')
+    pix_spec = ascii.read(loc + args.sourcename + '_pix_specfull.txt')
+# Expect 1612 line to always be weak and not clean-able so file will always be the same.
+spec1612 = ascii.read(new_outname + '_specfull.txt')
+pix_spec1612 = ascii.read(new_outname + '_pix_specfull.txt')
+beam_info = spec.meta['comments']
+print("\t", beam_info)
 
-if not os.path.isfile(new_outname + '_ohmaser_spec.png'):
-    print("[PLOT_OHMASER_SPEC] Read in the spectra.")
-    if os.path.isfile(loc + args.sourcename + '_oh_specfull.txt'):
-        spec = ascii.read(loc + args.sourcename + '_oh_specfull.txt')
-    else:
-        print("\tWARNING: 1665 MHz may not have been cleaned!!")
-        spec = ascii.read(loc + args.sourcename + '_specfull.txt')
-    spec1612 = ascii.read(new_outname + '_specfull.txt')
-    beam_info = spec.meta['comments']
-    print("\t", beam_info)
+print("[PLOT_OHMASER_SPEC] Make some plots.")
+smochan = [3, 5]
+box_kernel = Box1DKernel(smochan[0])
+smoothed_data_box = convolve(np.asfarray(spec['Flux [Jy/beam*pixel]']), box_kernel)
+fig, ax = plt.subplots(2, 1, figsize=(15, 8))
+ax[0].plot([spec[0][0], spec[-1][0]], [0, 0], c='gray', linestyle='--')
+ax[0].plot(spec['Frequency [Hz]'], smoothed_data_box, label='')
+ax[0].set_xlim(spec[0][0], spec[-1][0])
+ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.667 GHz')
+ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.665 GHz')
+ax[0].legend()
+ax[0].text(0.02, 0.8, 'Boxcar smoothed by {} channels'.format(smochan[0]), transform=ax[0].transAxes)
+ax[0].text(0.05, 0.9, 'z={:9.6f}'.format(z[0]), transform=ax[0].transAxes)
+box_kernel = Box1DKernel(smochan[1])
+smoothed_data_box = convolve(np.asfarray(spec1612['Flux [Jy/beam*pixel]']), box_kernel)
+ax[1].plot([spec1612[0][0], spec1612[-1][0]], [0, 0], c='gray', linestyle='--')
+ax[1].plot(spec1612['Frequency [Hz]'], smoothed_data_box, label='')
+ax[1].set_xlim(spec1612[0][0], spec1612[-1][0])
+ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.1, 0.1], linestyle='--', label='1.612 GHz', c='red')
+ax[1].legend()
+ax[1].text(0.02, 0.9, 'Boxcar smoothed by {} channels'.format(smochan[1]), transform=ax[1].transAxes)
+plt.savefig(loc + args.sourcename + '_ohmaser_spec.png', bbox_inches='tight')
 
-    print("[PLOT_OHMASER_SPEC] Make some plots.")
-    smochan = [3, 5]
-    box_kernel = Box1DKernel(smochan[0])
-    smoothed_data_box = convolve(np.asfarray(spec['Flux [Jy/beam*pixel]']), box_kernel)
-    fig, ax = plt.subplots(2, 1, figsize=(15, 8))
-    ax[0].plot([spec[0][0], spec[-1][0]], [0, 0], c='gray', linestyle='--')
-    ax[0].plot(spec['Frequency [Hz]'], smoothed_data_box, label='')
-    ax[0].set_xlim(spec[0][0], spec[-1][0])
-    ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.667 GHz')
-    ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.1, 0.26], linestyle='--', label='1.665 GHz')
-    ax[0].legend()
-    ax[0].text(0.02, 0.8, 'Boxcar smoothed by {} channels'.format(smochan[0]), transform=ax[0].transAxes)
-    ax[0].text(0.05, 0.9, 'z={:9.6f}'.format(z[0]), transform=ax[0].transAxes)
-    box_kernel = Box1DKernel(smochan[1])
-    smoothed_data_box = convolve(np.asfarray(spec1612['Flux [Jy/beam*pixel]']), box_kernel)
-    ax[1].plot([spec1612[0][0], spec1612[-1][0]], [0, 0], c='gray', linestyle='--')
-    ax[1].plot(spec1612['Frequency [Hz]'], smoothed_data_box, label='')
-    ax[1].set_xlim(spec1612[0][0], spec1612[-1][0])
-    ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.1, 0.1], linestyle='--', label='1.612 GHz', c='red')
-    ax[1].legend()
-    ax[1].text(0.02, 0.9, 'Boxcar smoothed by {} channels'.format(smochan[1]), transform=ax[1].transAxes)
-    plt.savefig(loc + args.sourcename + '_ohmaser_spec.png', bbox_inches='tight')
+box_kernel = Box1DKernel(smochan[0])
+smoothed_data_box = convolve(np.asfarray(pix_spec['Flux [Jy/beam*pixel]']), box_kernel)
+fig, ax = plt.subplots(2, 1, figsize=(15, 8))
+ax[0].plot([pix_spec[0][0], pix_spec[-1][0]], [0, 0], c='gray', linestyle='--')
+ax[0].plot(pix_spec['Frequency [Hz]'], smoothed_data_box, label='')
+ax[0].set_xlim(pix_spec[0][0], pix_spec[-1][0])
+ax[0].plot([f2_obs.to(u.Hz).value, f2_obs.to(u.Hz).value], [-0.005, 0.020], linestyle='--', label='1.667 GHz')
+ax[0].plot([f1_extrap.to(u.Hz).value, f1_extrap.to(u.Hz).value], [-0.005, 0.020], linestyle='--', label='1.665 GHz')
+ax[0].legend()
+ax[0].text(0.02, 0.8, 'Boxcar smoothed by {} channels'.format(smochan[0]), transform=ax[0].transAxes)
+ax[0].text(0.05, 0.9, 'z={:9.6f}'.format(z[0]), transform=ax[0].transAxes)
+box_kernel = Box1DKernel(smochan[1])
+smoothed_data_box = convolve(np.asfarray(pix_spec1612['Flux [Jy/beam*pixel]']), box_kernel)
+ax[1].plot([pix_spec1612[0][0], pix_spec1612[-1][0]], [0, 0], c='gray', linestyle='--')
+ax[1].plot(pix_spec1612['Frequency [Hz]'], smoothed_data_box, label='')
+ax[1].set_xlim(pix_spec1612[0][0], pix_spec1612[-1][0])
+ax[1].plot([f3_extrap.to(u.Hz).value, f3_extrap.to(u.Hz).value], [-0.004, 0.004],
+#           [np.nanmax(smoothed_data_box)*-1.05, np.nanmax(smoothed_data_box)*1.05],
+           linestyle='--', label='1.612 GHz', c='red')
+ax[1].legend()
+ax[1].text(0.02, 0.9, 'Boxcar smoothed by {} channels'.format(smochan[1]), transform=ax[1].transAxes)
+plt.savefig(loc + args.sourcename + '_ohmaser_pix_spec.png', bbox_inches='tight')
