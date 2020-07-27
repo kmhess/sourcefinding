@@ -118,7 +118,8 @@ reliability.plot           =  true
 # Mask dilation
 
 dilation.enable            =  false
-dilation.iterations        =  10
+dilation.iterationsXY      =  10
+dilation.iterationsZ       =  5
 dilation.threshold         =  0.001
 
 

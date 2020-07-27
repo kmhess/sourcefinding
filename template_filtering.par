@@ -112,6 +112,14 @@ reliability.fmin           =  20.0
 reliability.plot           =  true
 
 
+# Mask dilation
+
+dilation.enable            =  false
+dilation.iterationsXY      =  10
+dilation.iterationsZ       =  5
+dilation.threshold         =  0.001
+
+
 # Parameterisation
 
 parameter.enable           =  false
