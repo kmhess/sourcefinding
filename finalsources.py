@@ -150,7 +150,7 @@ for b in beams:
                     cPixZNew = int(Zc)
                     maxX = 2 * max(abs(cPixXNew - Xmin), abs(cPixXNew - Xmax))
                     maxY = 2 * max(abs(cPixYNew - Ymin), abs(cPixYNew - Ymax))
-                    maxZ = 2 * max(abs(cPixZNew - Zmin), abs(cPixZNew - Zmax))  # Larger so I have enough pixels for rms noise calc
+                    maxZ = 2 * max(abs(cPixZNew - Zmin), abs(cPixZNew - Zmax))
                     XminNew = cPixXNew - maxX
                     if XminNew < 0: XminNew = 0
                     YminNew = cPixYNew - maxY
@@ -184,7 +184,7 @@ for b in beams:
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
                     signal = np.nansum(spectrum[int(Zmin):int(Zmax)])
                     SJyHz.append(signal * chan_width.value / pix_per_beam)
-                    freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)
+                    freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)  # Remove int at some point!!!
                     # w50 & w20 in rest frame of the observer
                     w50.append((const.c * obj[cathead == "w50"][0] * chan_width / freq_sys).to(u.km/u.s).value)
                     w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_sys).to(u.km/u.s).value)
@@ -387,6 +387,7 @@ for b in beams:
                         fig = plt.figure(figsize=(8, 8))
                         ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
                         ax1.imshow(pv[0].data, cmap='gray')
+                        if np.all(np.isnan(pv[0].data)): continue
                         ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
                         ax1.autoscale(False)
                         ax1.plot([0.0, 0.0], [freq1, freq2], c='orange', linestyle='--', linewidth=0.75,
