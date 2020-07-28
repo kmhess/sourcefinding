@@ -7,6 +7,9 @@ from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import fits
 import numpy as np
 
+from multiprocessing import Queue, Process, cpu_count
+from tqdm.auto import trange
+
 
 def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     param_template = 'parameter_template_{}sig.par'.format(sig)
@@ -28,6 +31,33 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
 
     return new_paramfile, outlog
 
+def worker(inQueue, outQueue):
+
+    """
+    Defines the worker process of the parallelisation with multiprocessing.Queue
+    and multiprocessing.Process.
+    """
+    for i in iter(inQueue.get, 'STOP'):
+
+        status = run(i)
+
+        outQueue.put(( status ))
+
+
+def run(i):
+    global splinecube_data
+
+    try:
+        # Do the spline fitting on the z-axis to masked cube
+        fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]),
+                      np.nan_to_num(splinecube_data[:, x[i], y[i]]), k=5)
+        splinecube_data[:, x[i], y[i]] = orig_data[:, x[i], y[i]] - fit
+        return 'OK'
+
+    except Exception:
+        print("[ERROR] Something went wrong with the Spline fitting [" + str(i) + "]")
+        return np.nan
+
 
 ###################################################################
 
@@ -47,8 +77,13 @@ parser.add_argument('-o', "--overwrite",
                     help="If option is included, overwrite old continuum filtered file if it exists.",
                     action='store_true')
 
+parser.add_argument('-n', "--njobs",
+                    help="Number of jobs to run in parallel",
+                    default=4)
+
 # Parse the arguments above
 args = parser.parse_args()
+njobs = int(args.njobs)
 
 # Range of cubes/beams to work on:
 taskid = args.taskid
@@ -75,6 +110,9 @@ for b in beams:
         # Output exactly where sourcefinding is starting
         print('\t' + sourcefits)
 
+###############################################
+# Can this be parallelized? Especially the two for loops.
+
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
         if (not overwrite) & os.path.isfile(filteredfits):
             print("[SOURCEFINDING] Continuum filtered file exists and will not be overwritten.")
@@ -87,27 +125,90 @@ for b in beams:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
+        # Check to see if the spline fitted file exists.  If not, make it.
         if (not overwrite) & os.path.isfile(splinefits):
             print("[SOURCEFINDING] Spline fitted file exists and will not be overwritten.")
         elif os.path.isfile(sourcefits):
-            print("[SOURCEFINDING] Making spline fitted file.")
+            print(" - Loading the input cube")
             os.system('cp {} {}'.format(sourcefits, splinefits))
             splinecube = fits.open(splinefits, mode='update')
             orig = fits.open(sourcefits)
+            orig_data = orig[0].data
+            splinecube_data = splinecube[0].data
+
             # Try masking strong sources to not bias fit
-            mask = 2.5 * np.nanstd(orig[0].data)
-            splinecube[0].data[np.abs(splinecube[0].data) >= mask] = np.nan
+            print(" - Masking strong sources to not bias fit")
+            mask = 2.5 * np.nanstd(orig_data)
+            splinecube_data[np.abs(splinecube_data) >= mask] = np.nan
 
-            # Do the spline fitting on the z-axis to masked cube, replace spline cube with original minus fit
-            for x in range(orig[0].data.shape[1]):
-                print(x)
-                for y in range(orig[0].data.shape[2]):
-                    fit = fspline(np.linspace(1, orig[0].data.shape[0], orig[0].data.shape[0]),
-                                  np.nan_to_num(splinecube[0].data[:, x, y]), k=5)
-                    splinecube[0].data[:, x, y] = orig[0].data[:, x, y] - fit
+            # Defining the cases to analyse
+            print(" - Defining the cases to analyse")
+            xx = range(orig_data.shape[1])
+            yy = range(orig_data.shape[2])
+            x, y = np.meshgrid(xx, yy)
+            x = x.ravel()
+            y = y.ravel()
+            ncases = len(x)
+            # ncases = 10000
+            print(" - " + str(ncases) + " cases found")
 
+            if njobs > 1:
+                print(" - Running in parallel mode (" + str(njobs) + " jobs simultaneously)")
+            elif njobs == 1:
+                print(" - Running in serial mode")
+            else:
+                print("[ERROR] invalid number of NJOBS. Please use a positive number.")
+                exit()
+
+            # Managing the work PARALLEL or SERIAL accordingly
+            if njobs > cpu_count():
+                print(
+                    "  [WARNING] The chosen number of NJOBS seems to be larger than the number of CPUs in the system!")
+
+            # Create Queues
+            print("    - Creating Queues")
+            inQueue = Queue()
+            outQueue = Queue()
+
+            # Create worker processes
+            print("    - Creating worker processes")
+            ps = [Process(target=worker, args=(inQueue, outQueue)) for _ in range(njobs)]
+
+            # Start worker processes
+            print("    - Starting worker processes")
+            for p in ps: p.start()
+
+            # Fill the queue
+            print("    - Filling up the queue")
+            for i in trange(ncases):
+                inQueue.put((i))
+
+            # Now running the processes
+            print("    - Running the processes")
+            output = [outQueue.get() for _ in trange(ncases)]
+
+            # Send stop signal to stop iteration
+            for _ in range(njobs): inQueue.put('STOP')
+
+            # Stop processes
+            print("    - Stopping processes")
+            for p in ps: p.join()
+
+            # Updating the Splinecube file with the new data
+            print(" - Updating the Splinecube file")
+            splinecube.data = splinecube_data
             splinecube.flush()
+
+            # Closing files
+            print(" - Closing files")
             orig.close()
+            splinecube.close()
+
+        ################################################
+
+        else:
+            print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
+            continue
 
         print("[SOURCEFINDING] Doing source finding with 4 sigma threshold.")
         sig = 4

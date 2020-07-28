@@ -69,6 +69,7 @@ def main(taskid, beams):
                     filter2d = hdu_filter[0].data[0, :, :]
                     filter2d[np.isnan(filter2d)] = 9.
                     filter2d[filter2d < 9] = np.nan
+                    hdu_filter.close()
 
                     if os.path.isfile(loc + cube_name + '{}_4sig_cat.txt'.format(c)):
                         cat = ascii.read(loc + cube_name + '{}_4sig_cat.txt'.format(c))
@@ -82,7 +83,8 @@ def main(taskid, beams):
                         mask2d = np.asfarray(mask2d)
                         mask2d[mask2d < 1] = np.nan
 
-                        cube_frequencies = chan2freq(np.array(range(hdu_filter[0].data.shape[0])), hdu=hdu_filter)
+                        hdu_spline = fits.open(loc +cube_name + '{}_spline.fits'.format(c))
+                        cube_frequencies = chan2freq(np.array(range(hdu_spline[0].data.shape[0])), hdu=hdu_spline)
                         optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
 
                         ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
@@ -93,18 +95,18 @@ def main(taskid, beams):
                         for s in range(len(cat)):
                             ax_im[c-1].text(cat['col3'][s] + np.random.uniform(-40, 40), cat['col4'][s] + np.random.uniform(-40, 40),
                                             cat['col2'][s], color='black')
-                            spectrum = np.nansum(hdu_filter[0].data[:, mask2d == cat['col2'][s]], axis=1)
-                            maskmin = chan2freq(cat['col10'][s], hdu=hdu_filter).to(u.km/u.s, equivalencies=optical_HI).value
-                            maskmax = chan2freq(cat['col11'][s], hdu=hdu_filter).to(u.km/u.s, equivalencies=optical_HI).value
+                            spectrum = np.nansum(hdu_spline[0].data[:, mask2d == cat['col2'][s]], axis=1)
+                            maskmin = chan2freq(cat['col10'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
+                            maskmax = chan2freq(cat['col11'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
                             ax_spec[previous + s, 0].plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
                             ax_spec[previous + s, 0].plot(optical_velocity, spectrum, c=colors[c-1])
                             ax_spec[previous + s, 0].plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                             ax_spec[previous + s, 0].plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
                             ax_spec[previous + s, 0].set_title("Beam {:02}, Cube {}, Source {}".format(b, c, cat['col2'][s]))
                             ax_spec[previous + s, 0].set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                            if (np.max(spectrum) > 2.) | (np.min(spectrum) < -2.):
-                                ax_spec[previous + s, 0].set_ylim(np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * -2,
-                                                                  np.max(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
+                            if (np.nanmax(spectrum) > 2.) | (np.nanmin(spectrum) < -2.):
+                                ax_spec[previous + s, 0].set_ylim(np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * -2,
+                                                                  np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
                             ax_spec[previous + s, 0].set_ylabel("Integrated Flux")
                             if previous + s == source_per_beam - 1:
                                 ax_spec[previous + s, 0].set_xlabel("Optical Velocity [km/s]")
@@ -123,7 +125,6 @@ def main(taskid, beams):
                         ra.set_format_unit(u.hour)
                         ax_im[c - 1].axis('off')
 
-                    hdu_filter.close()
                 else:
                     print("\tNo continuum filtered file for Beam {:02} Cube {}. Check sourcefinding/ALTA?".format(b, c))
 

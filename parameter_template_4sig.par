@@ -37,7 +37,7 @@
 # Global settings
 
 pipeline.verbose           =  false
-pipeline.pedantic          =  true
+pipeline.pedantic          =  false
 pipeline.threads           =  0
 
 
