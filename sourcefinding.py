@@ -1,8 +1,10 @@
 import os
 
+from modules.natural_cubic_spline import fspline
 from src import checkmasks
 
 from argparse import ArgumentParser, RawTextHelpFormatter
+from astropy.io import fits
 import numpy as np
 
 
@@ -19,7 +21,7 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
         os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
 
     # Add back the parameters needed
-    os.system('echo "input.data                 =  ' + filteredfits + '" >> ' + new_paramfile)
+    os.system('echo "input.data                 =  ' + splinefits + '" >> ' + new_paramfile)
     os.system('echo "output.filename            =  ' + outroot + '" >> ' + new_paramfile)
     if cube == 3:
         os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
@@ -69,6 +71,7 @@ for b in beams:
 
         sourcefits = loc + cube_name + '.fits'
         filteredfits = loc + cube_name + '_filtered.fits'
+        splinefits = loc + cube_name + '_spline.fits'
         # Output exactly where sourcefinding is starting
         print('\t' + sourcefits)
 
@@ -83,6 +86,28 @@ for b in beams:
         else:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
+
+        if (not overwrite) & os.path.isfile(splinefits):
+            print("[SOURCEFINDING] Spline fitted file exists and will not be overwritten.")
+        elif os.path.isfile(sourcefits):
+            print("[SOURCEFINDING] Making spline fitted file.")
+            os.system('cp {} {}'.format(sourcefits, splinefits))
+            splinecube = fits.open(splinefits, mode='update')
+            orig = fits.open(sourcefits)
+            # Try masking strong sources to not bias fit
+            mask = 2.5 * np.nanstd(orig[0].data)
+            splinecube[0].data[np.abs(splinecube[0].data) >= mask] = np.nan
+
+            # Do the spline fitting on the z-axis to masked cube, replace spline cube with original minus fit
+            for x in range(orig[0].data.shape[1]):
+                print(x)
+                for y in range(orig[0].data.shape[2]):
+                    fit = fspline(np.linspace(1, orig[0].data.shape[0], orig[0].data.shape[0]),
+                                  np.nan_to_num(splinecube[0].data[:, x, y]), k=5)
+                    splinecube[0].data[:, x, y] = orig[0].data[:, x, y] - fit
+
+            splinecube.flush()
+            orig.close()
 
         print("[SOURCEFINDING] Doing source finding with 4 sigma threshold.")
         sig = 4
