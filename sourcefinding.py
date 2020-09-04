@@ -78,8 +78,8 @@ parser.add_argument('-o', "--overwrite",
                     action='store_true')
 
 parser.add_argument('-n', "--njobs",
-                    help="Number of jobs to run in parallel",
-                    default=4)
+                    help="Number of jobs to run in parallel (default: %(default)s) tested on happili-05.",
+                    default=18)
 
 # Parse the arguments above
 args = parser.parse_args()
@@ -106,7 +106,7 @@ for b in beams:
 
         sourcefits = loc + cube_name + '.fits'
         filteredfits = loc + cube_name + '_filtered.fits'
-        splinefits = loc + cube_name + '_spline.fits'
+        splinefits = loc + cube_name + '_filtered_spline.fits'
         # Output exactly where sourcefinding is starting
         print('\t' + sourcefits)
 
@@ -130,9 +130,9 @@ for b in beams:
             print("[SOURCEFINDING] Spline fitted file exists and will not be overwritten.")
         elif os.path.isfile(sourcefits):
             print(" - Loading the input cube")
-            os.system('cp {} {}'.format(sourcefits, splinefits))
+            os.system('cp {} {}'.format(filteredfits, splinefits))
             splinecube = fits.open(splinefits, mode='update')
-            orig = fits.open(sourcefits)
+            orig = fits.open(filteredfits)
             orig_data = orig[0].data
             splinecube_data = splinecube[0].data
 

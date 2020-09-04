@@ -83,7 +83,7 @@ def main(taskid, beams):
                         mask2d = np.asfarray(mask2d)
                         mask2d[mask2d < 1] = np.nan
 
-                        hdu_spline = fits.open(loc +cube_name + '{}_spline.fits'.format(c))
+                        hdu_spline = fits.open(loc +cube_name + '{}_filtered_spline.fits'.format(c))
                         cube_frequencies = chan2freq(np.array(range(hdu_spline[0].data.shape[0])), hdu=hdu_spline)
                         optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
 
@@ -128,8 +128,8 @@ def main(taskid, beams):
                 else:
                     print("\tNo continuum filtered file for Beam {:02} Cube {}. Check sourcefinding/ALTA?".format(b, c))
 
-            fig_im.savefig(loc + 'HI_image_4sig_summary.png', bbox_inches='tight')
-            fig_spec.savefig(loc + 'HI_image_4sig_summary_spec.png', bbox_inches='tight')
+            fig_im.savefig(loc + 'HI_image_4sig_summary_filtspline.png', bbox_inches='tight')
+            fig_spec.savefig(loc + 'HI_image_4sig_summary_spec_filtspline.png', bbox_inches='tight')
             plt.close(fig_im)
             plt.close(fig_spec)
         else:
