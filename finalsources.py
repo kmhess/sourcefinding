@@ -397,7 +397,13 @@ for b in beams:
                         ax1.set_title(src_name[-1], fontsize=16)
                         ax1.tick_params(axis='both', which='major', labelsize=18)
                         ax1.set_xlabel('Angular Offset', fontsize=16)
-                        ax1.set_ylabel('Frequency', fontsize=16)
+                        ax1.set_ylabel('Frequency [Hz]', fontsize=16)
+                        freq_yticks = ax1.get_yticks()  # freq auto yticks from matplotlib
+                        ax2 = ax1.twinx()
+                        vel1 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq1 - 1)
+                        vel2 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq2 - 1)
+                        ax2.set_ylim(vel1, vel2)
+                        ax2.set_ylabel('Velocity [km/s]')
                         ax1.text(0.5, 0.05, 'Kinematic PA = {:5.1f} deg'.format(kinpa.value), ha='center', va='center',
                                  transform=ax1.transAxes, color='white', fontsize=18)
                         fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
