@@ -90,18 +90,21 @@ for b in beams:
         catalog = ascii.read(loc + 'clean_cat.txt', header_start=1)
 
         for c in cubes:
-            if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)):
+            if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)) | os.path.isfile(loc + cube_name + '{}_clean_cbcor.fits'.format(c)):
                 cat = catalog[catalog['cube'] == c]
                 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
                 print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
 
                 # Read in the cleaned data and original SoFiA mask:
-                hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
+                if os.path.isfile(loc + cube_name + '{}_clean_cbcor.fits'.format(c)):
+                    hdu_clean = fits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+                else:
+                    hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
                 hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
                 pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c), hdu_clean, b, c)
-                hdu_pb = pyfits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+                hdu_pb = fits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
 
                 outname = 'X_{}_{:02}_{}'.format(taskid, b, c)
                 wcs = WCS(hdu_clean[0].header)
@@ -398,6 +401,7 @@ for b in beams:
                         ax1.tick_params(axis='both', which='major', labelsize=18)
                         ax1.set_xlabel('Angular Offset', fontsize=16)
                         ax1.set_ylabel('Frequency [Hz]', fontsize=16)
+                        ax1.coords[1].set_ticks_position('l')
                         freq_yticks = ax1.get_yticks()  # freq auto yticks from matplotlib
                         ax2 = ax1.twinx()
                         vel1 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq1 - 1)
