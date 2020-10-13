@@ -38,7 +38,7 @@
 
 pipeline.verbose           =  false
 pipeline.pedantic          =  false
-pipeline.threads           =  0
+pipeline.threads           =  24
 
 
 # Input
@@ -61,6 +61,15 @@ flag.radiusSpatial         =  0
 flag.log                   =  false
 
 
+# Continuum subtraction
+
+contsub.enable             =  false
+contsub.order              =  0
+contsub.threshold          =  2.0
+contsub.shift              =  4
+contsub.padding            =  3
+
+
 # Noise scaling
 
 scaleNoise.enable          =  true
@@ -73,6 +82,14 @@ scaleNoise.gridXY          =  0
 scaleNoise.gridZ           =  0
 scaleNoise.interpolate     =  false
 scaleNoise.scfind          =  true
+
+
+# Spatial filter
+
+spatFilter.enable          =  false
+spatFilter.window          =  50
+spatFilter.statistic       =  median
+spatFilter.boxcar          =  0
 
 
 # S+C finder
