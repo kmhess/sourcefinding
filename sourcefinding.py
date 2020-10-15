@@ -15,7 +15,6 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     param_template = 'parameter_template_{}sig.par'.format(sig)
     new_paramfile = loc_dir + 'parameter_{}sig.par'.format(sig)
     outlog = loc_dir + 'sourcefinding_{}sig.out'.format(sig)
-    outroot = cube_name + '_{}sig'.format(sig)
 
     # Edit parameter file (remove lines that need editing)
     os.system('grep -vwE "(input.data)" ' + param_template + ' > ' + new_paramfile)
@@ -24,7 +23,13 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
         os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
 
     # Add back the parameters needed
-    os.system('echo "input.data                 =  ' + splinefits + '" >> ' + new_paramfile)
+    if not args.nospline:
+        os.system('echo "input.data                 =  ' + splinefits + '" >> ' + new_paramfile)
+        outroot = cube_name + '_{}sig'.format(sig)
+    else:
+        os.system('echo "input.data                 =  ' + filteredfits + '" >> ' + new_paramfile)
+        outroot = cube_name + '_{}sig'.format(sig)
+
     os.system('echo "output.filename            =  ' + outroot + '" >> ' + new_paramfile)
     if cube == 3:
         os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
@@ -74,10 +79,14 @@ parser.add_argument('-c', '--cubes', default='1,2,3',
                     help='Specify the cubes on which to do source finding (default: %(default)s).')
 
 parser.add_argument('-o', "--overwrite",
-                    help="If option is included, overwrite old continuum filtered file if it exists.",
+                    help="If option is included, overwrite old continuum filtered and/or spline fitted file if either exists.",
                     action='store_true')
 
-parser.add_argument('-n', "--njobs",
+parser.add_argument('-n', "--nospline",
+                    help="Don't do spline fitting; so source finding on only continuum filtered cube.",
+                    action='store_true')
+
+parser.add_argument('-j', "--njobs",
                     help="Number of jobs to run in parallel (default: %(default)s) tested on happili-05.",
                     default=18)
 
@@ -125,10 +134,10 @@ for b in beams:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
-        # Check to see if the spline fitted file exists.  If not, make it.
+        # Check to see if the spline fitted file exists.  If not, make it from filtered file.
         if (not overwrite) & os.path.isfile(splinefits):
             print("[SOURCEFINDING] Spline fitted file exists and will not be overwritten.")
-        elif os.path.isfile(sourcefits):
+        elif os.path.isfile(sourcefits) & (not args.nospline):
             print(" - Loading the input cube")
             os.system('cp {} {}'.format(filteredfits, splinefits))
             splinecube = fits.open(splinefits, mode='update')
@@ -205,7 +214,9 @@ for b in beams:
             splinecube.close()
 
         ################################################
-
+        elif os.path.isfile(sourcefits) & args.nospline:
+            print("\tWill not perform spline fitting.  Do source finding on just continuum filtered file.")
+            print("\t [WARNING]: this is not the default but the file names are the SAME! Keep track of what you're doing for future steps !!!")
         else:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
