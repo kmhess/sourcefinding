@@ -1,5 +1,8 @@
+from __future__ import print_function
 import logging
 import os
+
+from modules.natural_cubic_spline import fspline
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import ascii
@@ -32,8 +35,12 @@ parser.add_argument('-c', '--cubes', default='1,2,3',
 parser.add_argument('-s', '--sources', default='all',
                     help='Specify sources to clean.  Can specify range or list. (default: %(default)s).')
 
+parser.add_argument('-n', "--nospline",
+                    help="Don't do spline fitting; so source finding on only continuum filtered cube.",
+                    action='store_true')
+
 parser.add_argument('-o', "--overwrite",
-                    help="If option is included, overwrite old clean, model, and residual FITS files.",
+                    help="If option is included, overwrite old clean, model, and residual FITS files and 'repaired' spline file.",
                     action='store_true')
 
 # Parse the arguments above
@@ -79,41 +86,87 @@ for b in beams:
 
     managefiles.director(prepare, 'ch', loc)
 
-    if args.sources == 'all':
-        mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.ge.1)"'
-    elif '-' in args.sources:
-        mask_range = args.sources.split('-')
-        sources = [str(s + int(mask_range[0])) for s in range(int(mask_range[1]) - int(mask_range[0]) + 1)]
-        mask_expr = '"(<mask_sofia>.eq.-1).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(mask_range[0],
-                                                                                                       mask_range[1])
-    else:
-        sources = [str(s) for s in args.sources.split(',')]
-        mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.eq.' + ').or.(<mask_sofia>.eq.'.join(sources) + ')"'
-
     for c in cubes:
         line_cube = cube_name + '{0}.fits'.format(c)
         beam_cube = beam_name + '{0}.fits'.format(c)
-        mask_cube = cube_name + '{0}_4sig_mask.fits'.format(c)
-        filter_cube = cube_name + '{0}_filtered.fits'.format(c)
+        maskfits = cube_name + '{0}_4sig_mask.fits'.format(c)
+        mask2dfits = cube_name + '{0}_4sig_mask-2d.fits'.format(c)
+        filteredfits = cube_name + '{0}_filtered.fits'.format(c)
+        splinefits = cube_name + '{0}_filtered_spline.fits'.format(c)
+        new_splinefits = cube_name + '{0}_all_spline.fits'.format(c)
         catalog_file = cube_name + '{0}_4sig_cat.txt'.format(c)
 
-        if os.path.isfile(mask_cube):
-            # Output what exactly is being used to clean the data
-            print("\t{}".format(mask_cube))
-            # Edit mask cube to trick Miriad into using the whole volume.
-            m = pyfits.open(mask_cube, mode='update')
-            m[0].data[0, 0, 0] = -1
-            m[0].data[-1, -1, -1] = -1
-            m[0].scale('int16')
-            m.flush()
+        if os.path.isfile(maskfits):
+            catalog = ascii.read(catalog_file, header_start=10)
+            if args.sources == 'all':
+                mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.ge.1)"'
+                sources = [str(s + 1) for s in range(len(catalog))]
+            elif '-' in args.sources:
+                mask_range = args.sources.split('-')
+                sources = [str(s + int(mask_range[0])) for s in range(int(mask_range[1]) - int(mask_range[0]) + 1)]
+                mask_expr = '"(<mask_sofia>.eq.-1).or.((<mask_sofia>.ge.{}).and.(<mask_sofia>.le.{}))"'.format(
+                    mask_range[0],
+                    mask_range[-1])
+            else:
+                sources = [str(s) for s in args.sources.split(',')]
+                mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.eq.' + ').or.(<mask_sofia>.eq.'.join(sources) + ')"'
 
-            print("[CLEAN] Determining the statistics of Beam {:02}, Cube {}.".format(b, c))
-            f = pyfits.open(filter_cube)
+            # If cleaning the filtered_spline cube, rather than original data: do some repair work.
+            if (not args.nospline) & ((not os.path.isfile(new_splinefits)) | args.overwrite):
+                print("[CLEAN] Creating a 'repaired' spline cube for Beam {:02}, Cube {}.".format(b, c))
+                # os.system('cp {} {}'.format(splinefits, new_splinefits))
+                print("\t{}".format(new_splinefits))
+                new_splinecube = pyfits.open(new_splinefits, mode='update')
+                # maskcube = pyfits.open(maskfits)  # For multiple source along line of sight...need to develop!
+                mask2d = pyfits.getdata(mask2dfits)
+                orig_data = pyfits.getdata(line_cube)
+                filtered_pixels = np.copy(new_splinecube[0].data[0, :, :])
+                xx, yy = range(filtered_pixels.shape[0]), range(filtered_pixels.shape[1])
+                x, y = np.meshgrid(xx, yy)
+                x, y = x.ravel(), y.ravel()
+                for i in range(len(x)):
+                    # First, replace the previous continuum filtered pixels with spline fitted values, without masking:
+                    if np.isnan(filtered_pixels[x[i], y[i]]): #| (str(mask2d[x[i], y[i]]) not in sources):
+                        print('continuum', end=" ")
+                        temp = np.copy(orig_data[:, x[i], y[i]])
+                        fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=5)
+                        new_splinecube[0].data[:, x[i], y[i]] = temp - fit
+                    # Second, use source mask to undo potential over subtraction:
+                    if str(mask2d[x[i], y[i]]) in sources:
+                        print('hi', end=" ")
+                        s = mask2d[x[i], y[i]]
+                        zmin, zmax = np.int(catalog[catalog['id'] == s]['z_min']), np.int(catalog[catalog['id'] == s]['z_max'])
+                        print(zmin, zmax, end=" ")
+                        temp = np.copy(orig_data[:, x[i], y[i]])
+                        # Currently nan --> 0, but could try N (10) nearest neighbors instead...
+                        # This also doesn't deal with multiple sources along the line of sight...(but then can't do N-nn)
+                        temp[zmin:zmax] = np.nan
+                        fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=12)
+                        new_splinecube[0].data[:, x[i], y[i]] = orig_data[:, x[i], y[i]] - fit
+                print("\n")
+                new_splinecube.flush()
+                # maskcube.close()   # For multiple sources along line of sight...(close file after)
+
+            if args.nospline:
+                f = pyfits.open(filteredfits)
+                print("[CLEAN] Determining the statistics from the filtered Beam {:02}, Cube {}.".format(b, c))
+            else:
+                f = pyfits.open(splinefits)
+                print("[CLEAN] Determining the statistics from the filtered & spline fitted Beam {:02}, Cube {}.".format(b, c))
             mask = np.ones(f[0].data.shape[0], dtype=bool)
             if c == 3: mask[376:662] = False
             lineimagestats = [np.nanmin(f[0].data[mask]), np.nanmax(f[0].data[mask]), np.nanstd(f[0].data[mask])]
             f.close()
             print("\tImage min, max, std: {}".format(lineimagestats[:]))
+
+            # Output what exactly is being used to clean the data
+            print("\t{}".format(maskfits))
+            # Edit mask cube to trick Miriad into using the whole volume.
+            m = pyfits.open(maskfits, mode='update')
+            m[0].data[0, 0, 0] = -1
+            m[0].data[-1, -1, -1] = -1
+            m[0].scale('int16')
+            m.flush()
 
             # Delete any pre-existing Miriad files.
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
@@ -122,7 +175,10 @@ for b in beams:
 
             fits = lib.miriad('fits')
             fits.op = 'xyin'
-            fits.in_ = line_cube
+            if args.nospline:
+                fits.in_ = line_cube
+            else:
+                fits.in_ = new_splinefits
             fits.out = 'map_00'
             fits.go()
 
@@ -134,7 +190,7 @@ for b in beams:
             fits.go()
 
             # Work with mask_sofia in current directory...otherwise worried about miriad character length for mask_expr
-            fits.in_ = mask_cube
+            fits.in_ = maskfits
             fits.out = 'mask_sofia'
             fits.go()
 
@@ -189,7 +245,7 @@ for b in beams:
             fits.go()
 
             catalog = ascii.read(catalog_file, header_start=10)
-            catalog['taskid'] = np.int(taskid.replace('/',''))
+            catalog['taskid'] = np.int(taskid.replace('/', ''))
             catalog['beam'] = b
             catalog['cube'] = c
             catalog_reorder = catalog['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
