@@ -9,7 +9,8 @@ from astropy.io import ascii
 import astropy.io.fits as pyfits
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from multiprocessing import Queue, Process, cpu_count
+from tqdm.auto import trange
 
 from apercal.libs import lib
 from apercal.subs import managefiles
@@ -18,6 +19,47 @@ import apercal
 from modules.functions import write_catalog
 
 
+def worker(inQueue, outQueue):
+
+    """
+    Defines the worker process of the parallelisation with multiprocessing.Queue
+    and multiprocessing.Process.
+    """
+    for i in iter(inQueue.get, 'STOP'):
+
+        status = run(i)
+
+        outQueue.put(( status ))
+
+
+def run(i):
+    global new_splinecube_data
+
+    try:
+        # Do the spline fitting on the z-axis to masked cube
+        # First, replace the previous continuum filtered pixels with spline fitted values, without masking:
+        if np.isnan(filtered_pixels[x[i], y[i]]):  # | (str(mask2d[x[i], y[i]]) not in sources):
+            # print('continuum', end=" ")
+            temp = np.copy(orig_data[:, x[i], y[i]])
+            fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=5)
+            new_splinecube_data[:, x[i], y[i]] = temp - fit
+        # Second, use source mask to undo potential over subtraction:
+        if str(mask2d[x[i], y[i]]) in sources:
+            # print('hi', end=" ")
+            s = mask2d[x[i], y[i]]
+            zmin, zmax = np.int(catalog[catalog['id'] == s]['z_min']), np.int(catalog[catalog['id'] == s]['z_max'])
+            # print(zmin, zmax, end=" ")
+            temp = np.copy(orig_data[:, x[i], y[i]])
+            # Currently nan --> 0, but could try N (10) nearest neighbors instead...
+            # This also doesn't deal with multiple sources along the line of sight...(but then can't do N-nn)
+            temp[zmin:zmax] = np.nan
+            fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=12)
+            new_splinecube_data[:, x[i], y[i]] = orig_data[:, x[i], y[i]] - fit
+        return 'OK'
+
+    except Exception:
+        print("[ERROR] Something went wrong with the Spline fitting [" + str(i) + "]")
+        return np.nan
 ###################################################################
 
 parser = ArgumentParser(description="Do source finding in the HI spectral line cubes for a given taskid, beam, cubes",
@@ -43,8 +85,13 @@ parser.add_argument('-o', "--overwrite",
                     help="If option is included, overwrite old clean, model, and residual FITS files and 'repaired' spline file.",
                     action='store_true')
 
+parser.add_argument('-j', "--njobs",
+                    help="Number of jobs to run in parallel (default: %(default)s) tested on happili-05.",
+                    default=18)
+
 # Parse the arguments above
 args = parser.parse_args()
+njobs = int(args.njobs)
 
 ###################################################################
 
@@ -114,38 +161,75 @@ for b in beams:
             # If cleaning the filtered_spline cube, rather than original data: do some repair work.
             if (not args.nospline) & ((not os.path.isfile(new_splinefits)) | args.overwrite):
                 print("[CLEAN] Creating a 'repaired' spline cube for Beam {:02}, Cube {}.".format(b, c))
-                # os.system('cp {} {}'.format(splinefits, new_splinefits))
+                os.system('cp {} {}'.format(splinefits, new_splinefits))
                 print("\t{}".format(new_splinefits))
                 new_splinecube = pyfits.open(new_splinefits, mode='update')
                 # maskcube = pyfits.open(maskfits)  # For multiple source along line of sight...need to develop!
                 mask2d = pyfits.getdata(mask2dfits)
                 orig_data = pyfits.getdata(line_cube)
+                new_splinecube_data = new_splinecube[0].data
                 filtered_pixels = np.copy(new_splinecube[0].data[0, :, :])
+
+                ################################################
+                # Parallelization of repair
                 xx, yy = range(filtered_pixels.shape[0]), range(filtered_pixels.shape[1])
                 x, y = np.meshgrid(xx, yy)
                 x, y = x.ravel(), y.ravel()
-                for i in range(len(x)):
-                    # First, replace the previous continuum filtered pixels with spline fitted values, without masking:
-                    if np.isnan(filtered_pixels[x[i], y[i]]): #| (str(mask2d[x[i], y[i]]) not in sources):
-                        print('continuum', end=" ")
-                        temp = np.copy(orig_data[:, x[i], y[i]])
-                        fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=5)
-                        new_splinecube[0].data[:, x[i], y[i]] = temp - fit
-                    # Second, use source mask to undo potential over subtraction:
-                    if str(mask2d[x[i], y[i]]) in sources:
-                        print('hi', end=" ")
-                        s = mask2d[x[i], y[i]]
-                        zmin, zmax = np.int(catalog[catalog['id'] == s]['z_min']), np.int(catalog[catalog['id'] == s]['z_max'])
-                        print(zmin, zmax, end=" ")
-                        temp = np.copy(orig_data[:, x[i], y[i]])
-                        # Currently nan --> 0, but could try N (10) nearest neighbors instead...
-                        # This also doesn't deal with multiple sources along the line of sight...(but then can't do N-nn)
-                        temp[zmin:zmax] = np.nan
-                        fit = fspline(np.linspace(1, orig_data.shape[0], orig_data.shape[0]), np.nan_to_num(temp), k=12)
-                        new_splinecube[0].data[:, x[i], y[i]] = orig_data[:, x[i], y[i]] - fit
-                print("\n")
+                ncases = len(x)
+                print(" - " + str(ncases) + " cases found")
+
+                if njobs > 1:
+                    print(" - Running in parallel mode (" + str(njobs) + " jobs simultaneously)")
+                elif njobs == 1:
+                    print(" - Running in serial mode")
+                else:
+                    print("[ERROR] invalid number of NJOBS. Please use a positive number.")
+                    exit()
+
+                # Managing the work PARALLEL or SERIAL accordingly
+                if njobs > cpu_count():
+                    print(
+                        "  [WARNING] The chosen number of NJOBS seems to be larger than the number of CPUs in the system!")
+
+                # Create Queues
+                print("    - Creating Queues")
+                inQueue = Queue()
+                outQueue = Queue()
+
+                # Create worker processes
+                print("    - Creating worker processes")
+                ps = [Process(target=worker, args=(inQueue, outQueue)) for _ in range(njobs)]
+
+                # Start worker processes
+                print("    - Starting worker processes")
+                for p in ps: p.start()
+
+                # Fill the queue
+                print("    - Filling up the queue")
+                for i in trange(ncases):
+                    inQueue.put((i))
+
+                # Now running the processes
+                print("    - Running the processes")
+                output = [outQueue.get() for _ in trange(ncases)]
+
+                # Send stop signal to stop iteration
+                for _ in range(njobs): inQueue.put('STOP')
+
+                # Stop processes
+                print("    - Stopping processes")
+                for p in ps: p.join()
+
+                # Updating the Splinecube file with the new data
+                print(" - Updating the Splinecube file")
+                new_splinecube.data = new_splinecube_data
                 new_splinecube.flush()
-                # maskcube.close()   # For multiple sources along line of sight...(close file after)
+
+                # Closing files
+                print(" - Closing files")
+                new_splinecube.close()
+
+                ################################################
 
             if args.nospline:
                 f = pyfits.open(filteredfits)
@@ -236,6 +320,7 @@ for b in beams:
             fits.out = line_cube[:-5] + '_clean.fits'
             fits.go()
 
+            # fits.op = 'xyout'
             # fits.in_ = loc + 'residual_' + str(minc + 1).zfill(2)
             # fits.out = line_cube[:-5] + '_residual.fits'
             # fits.go()
