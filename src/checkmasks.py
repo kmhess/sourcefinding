@@ -66,7 +66,8 @@ def main(taskid, beams):
             for c in cubes:
                 if os.path.isfile(loc + cube_name + '{}_filtered.fits'.format(c)):
                     hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
-                    filter2d = hdu_filter[0].data[0, :, :]
+                    # SVC data has the 0th channel blanked; so use the first channel instead.
+                    filter2d = hdu_filter[0].data[1, :, :]
                     filter2d[np.isnan(filter2d)] = 9.
                     filter2d[filter2d < 9] = np.nan
                     hdu_filter.close()
