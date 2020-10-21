@@ -227,4 +227,4 @@ for b in beams:
         os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
 
     # After all cubes are done, run checkmasks to get summary plots for cleaning:
-    checkmasks.main(taskid, [b])
+    checkmasks.main(taskid, [b], args.nospline)

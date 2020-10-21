@@ -24,13 +24,17 @@ def parse_args():
     parser.add_argument('-b', '--beams', default='0-39',
                         help='Specify a range (0-39) or list (3,5,7,11) of beams on which to do source finding (default: %(default)s).')
 
+    parser.add_argument('-n', "--nospline",
+                        help="Only controls output name of png!  For book keeping purposes.",
+                        action='store_true')
+
     # Parse the arguments above
     args = parser.parse_args()
     return args
 
 
 # If running by itself use: python -m src/checkmasks -t 191004041 -b 14
-def main(taskid, beams):
+def main(taskid, beams, nospline=False):
 
     cubes = [1, 2, 3]  # Most sources in 2; nearest galaxies in 3.
     max_cat_len = 25
@@ -129,8 +133,12 @@ def main(taskid, beams):
                 else:
                     print("\tNo continuum filtered file for Beam {:02} Cube {}. Check sourcefinding/ALTA?".format(b, c))
 
-            fig_im.savefig(loc + 'HI_image_4sig_summary_filtspline.png', bbox_inches='tight')
-            fig_spec.savefig(loc + 'HI_image_4sig_summary_spec_filtspline.png', bbox_inches='tight')
+            if nospline:
+                fig_im.savefig(loc + 'HI_image_4sig_summary.png', bbox_inches='tight')
+                fig_spec.savefig(loc + 'HI_image_4sig_summary_spec.png', bbox_inches='tight')
+            else:
+                fig_im.savefig(loc + 'HI_image_4sig_summary_filtspline.png', bbox_inches='tight')
+                fig_spec.savefig(loc + 'HI_image_4sig_summary_spec_filtspline.png', bbox_inches='tight')
             plt.close(fig_im)
             plt.close(fig_spec)
         else:
