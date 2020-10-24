@@ -89,9 +89,10 @@ def model_lookup(taskid, beam):
 
     # *** Until we have a full beam complement ***:
     if beam >= 32:
-        best = '191002'
+        # best = '191002'
+        best = '191023'
 
-    model = model_dir + '{}/beam_models_old/chann_9/{}_{:02}_I_model.fits'.format(best, best, beam)
+    model = model_dir + '{}/beam_models/chann_9/{}_{:02}_I_model.fits'.format(best, best, beam)
 
     return model
 
