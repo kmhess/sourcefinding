@@ -46,13 +46,13 @@ Generates a catalog of what SoFiA sources have been cleaned, for each \*beam*.  
 
 Output:  
 `HI_image_cube*_all_spline.fits` - (default) repaired filtered_spline cube which is then cleaned.  
-`HI_image_cube*_clean.fits` - cleaned cube, used in `finalsources.py`.  
-`HI_image_cube*_model.fits` - model cube  
-`HI_image_cube*_residual.fits` - residual cube  
+`HI_image_cube*{_rep}_clean.fits` - cleaned cube, used in `finalsources.py`.  
+`HI_image_cube*{_rep}_model.fits` - model cube  
+`HI_image_cube*{_rep}_residual.fits` - residual cube  
 
-`clean_cat.txt` - modified version of SoFiA output catalog, appended with taskid, beam, cube numbers.  Used in `finalsources.py`.
+`{rep}_clean_cat.txt` - modified version of SoFiA output catalog, appended with taskid, beam, cube numbers.  Used in `finalsources.py`.
 
-\**ALL OUTPUT HAS SAME NAME REGARDLESS OF INPUT. UP TO USER TO KEEP TRACK OF WHETHER SPLINE FITTING HAS BEEN DONE OR NOT.\**
+\**OUTPUT NAME VARIES DEPENDING ON SPLINE FITTING INPUT OR NOT.\**
 
 ### Step 3: finalsources.py
 ```
@@ -85,3 +85,5 @@ Output:
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_spec.png` - SoFiA generated spectrum
 
 `final_cat.txt` - Source catalog with physically derived source properties
+
+\*\*ALL OUTPUT HAS SAME NAME REGARDLESS OF INPUT. UP TO USER TO KEEP TRACK OF WHETHER SPLINE FITTING HAS BEEN DONE OR NOT.\*\*
