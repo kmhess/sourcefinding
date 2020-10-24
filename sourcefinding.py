@@ -137,7 +137,7 @@ for b in beams:
         # Check to see if the spline fitted file exists.  If not, make it from filtered file.
         if (not overwrite) & os.path.isfile(splinefits):
             print("[SOURCEFINDING] Spline fitted file exists and will not be overwritten.")
-        elif os.path.isfile(sourcefits) & (not args.nospline):
+        elif os.path.isfile(filteredfits) & (not args.nospline):
             print(" - Loading the input cube")
             os.system('cp {} {}'.format(filteredfits, splinefits))
             splinecube = fits.open(splinefits, mode='update')
