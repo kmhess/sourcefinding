@@ -317,7 +317,10 @@ for b in beams:
             print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
             fits.op = 'xyout'
             fits.in_ = 'image_' + str(minc + 1).zfill(2)
-            fits.out = line_cube[:-5] + '_clean.fits'
+            if args.nospline:
+                fits.out = line_cube[:-5] + '_clean.fits'
+            else:
+                fits.out = line_cube[:-5] + '_rep_clean.fits'
             fits.go()
 
             # fits.op = 'xyout'
@@ -326,7 +329,10 @@ for b in beams:
             # fits.go()
 
             fits.in_ = loc + 'model_' + str(minc + 1).zfill(2)
-            fits.out = line_cube[:-5] + '_model.fits'
+            if args.nospline:
+                fits.out = line_cube[:-5] + '_model.fits'
+            else:
+                fits.out = line_cube[:-5] + '_rep_model.fits'
             fits.go()
 
             catalog = ascii.read(catalog_file, header_start=10)
@@ -351,8 +357,12 @@ for b in beams:
                         obj.append(s)
                     objects.append(obj)
 
-            print("[CLEAN] Writing/updating cleaned source catalog: clean_cat.txt")
-            write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
+            if args.nospline:
+                print("[CLEAN] Writing/updating cleaned source catalog: clean_cat.txt")
+                write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc+'clean_cat.txt')
+            else:
+                print("[CLEAN] Writing/updating cleaned source catalog: rep_clean_cat.txt")
+                write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'rep_clean_cat.txt')
 
             # Clean up extra Miriad files
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
