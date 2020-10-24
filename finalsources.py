@@ -48,8 +48,18 @@ parser.add_argument('-b', '--beams', default='0-39',
 parser.add_argument('-c', '--cubes', default='1,2,3',
                     help='Specify the cubes on which to do source finding (default: %(default)s).')
 
+parser.add_argument('-n', "--nospline",
+                    help="No spline fitting has been done; so use clean cube not repaired clean cube.",
+                    action='store_true')
+
 # Parse the arguments above
 args = parser.parse_args()
+
+# Work on spline fitted (and repaired) data or not:
+if args.nospline:
+    clean_name = 'clean'
+else:
+    clean_name = 'rep_clean'
 
 # Range of cubes/beams to work on:
 taskid = args.taskid.replace("/", "")
@@ -85,26 +95,27 @@ catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
 
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
-    if os.path.isfile(loc + 'clean_cat.txt'):
+    if os.path.isfile(loc + '{}_cat.txt'.format(clean_name)):
         # Read in the master catalog of cleaned sources
-        catalog = ascii.read(loc + 'clean_cat.txt', header_start=1)
+        catalog = ascii.read(loc + '{}_cat.txt'.format(clean_name), header_start=1)
 
         for c in cubes:
-            if os.path.isfile(loc + cube_name + '{}_clean.fits'.format(c)) | os.path.isfile(loc + cube_name + '{}_clean_cbcor.fits'.format(c)):
+            if os.path.isfile(loc + cube_name + '{}_{}.fits'.format(c, clean_name)) | \
+                    os.path.isfile(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name)):
                 cat = catalog[catalog['cube'] == c]
                 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
                 print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
 
                 # Read in the cleaned data and original SoFiA mask:
-                if os.path.isfile(loc + cube_name + '{}_clean_cbcor.fits'.format(c)):
-                    hdu_clean = fits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+                if os.path.isfile(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name)):
+                    hdu_clean = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
                 else:
-                    hdu_clean = fits.open(loc + cube_name + '{}_clean.fits'.format(c))
+                    hdu_clean = fits.open(loc + cube_name + '{}_{}.fits'.format(c, clean_name))
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
                 hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
-                pbcor(taskid, loc + cube_name + '{}_clean.fits'.format(c), hdu_clean, b, c)
-                hdu_pb = fits.open(loc + cube_name + '{}_clean_cbcor.fits'.format(c))
+                pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)
+                hdu_pb = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
 
                 outname = 'X_{}_{:02}_{}'.format(taskid, b, c)
                 wcs = WCS(hdu_clean[0].header)
@@ -504,7 +515,7 @@ for b in beams:
             else:
                 print("\tNo CLEAN cube for Beam {:02}, Cube {}".format(b, c))
     else:
-        print("\tNo clean_cat.txt for Beam {:02}".format(b))
+        print("\tNo {}_cat.txt for Beam {:02}".format(clean_name, b))
 
 print("\tBeam info in *specfull.txt can be read from the text files like: a.meta['comments'][0].replace('= ','').split()")
 print("[FINALSOURCES] Done.")
