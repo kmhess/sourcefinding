@@ -15,6 +15,7 @@ from astroquery.skyview import SkyView
 from cosmocalc import cosmocalc
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
+from matplotlib import colors
 import numpy as np
 from reproject import reproject_interp
 from scipy import ndimage
@@ -318,12 +319,14 @@ for b in beams:
 
                             # Make HI significance image
                             if not os.path.isfile(new_outname + '_signif.png'):
+                                wa_cmap = colors.ListedColormap(['w','b','g','yellow','orange','r'])
+                                boundaries = [0,1,2,3,4,5,6]
+                                norm = colors.BoundaryNorm(boundaries, wa_cmap.N, clip=True)
                                 print("[FINALSOURCES] Making HI significance image for source {}".format(new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                                im = ax1.imshow(significance, cmap='plasma', origin='lower')
-                                ax1.contour(significance, cmap='viridis', linewidth=0.7,
-                                            levels=[1, 2, 3, 4, 6, 8, 12])
+                                im = ax1.imshow(significance, cmap=wa_cmap, origin='lower', norm=norm)
+                                ax1.contour(hi_reprojected, linewidths=0.7,levels=[sensitivity,],colors=['k',])
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
