@@ -258,10 +258,15 @@ for b in beams:
                             # Calculate noise over narrower range to avoid bad spws
                             subsubcube = subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
                             rms = np.nanstd(subsubcube[submask == 0]) * chan_width.value
-                            nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19
+                            hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
+                            mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
+                            significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
+                            sensitivity = np.median(hi_reprojected[(significance>=2)*(significance<=3)])
+                            nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19 # 1 sigma
                             print("\t1sig N_HI is {}e+19".format(nhi19))
                             nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
                                         "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
+
                             # Overlay HI contours on optical image
                             if not os.path.isfile(new_outname + '_mom0.png'):
                                 print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
@@ -269,7 +274,7 @@ for b in beams:
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
                                 ax1.contour(hi_reprojected, cmap='Oranges', linewidth=0.8,
-                                            levels=[rms * 3, rms * 5, rms * 10, rms * 20, rms * 40]) #, rms * 80]
+                                            levels=sensitivity*2**np.range(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
@@ -313,9 +318,6 @@ for b in beams:
 
                             # Make HI significance image
                             if not os.path.isfile(new_outname + '_signif.png'):
-                                hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
-                                mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
-                                significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
                                 print("[FINALSOURCES] Making HI significance image for source {}".format(new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
