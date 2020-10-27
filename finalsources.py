@@ -274,7 +274,7 @@ for b in beams:
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
-                                ax1.contour(hi_reprojected, cmap='Oranges', linewidth=0.8,
+                                ax1.contour(hi_reprojected, cmap='Oranges', linewidths=0.8,
                                             levels=sensitivity*2**np.range(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
@@ -297,8 +297,8 @@ for b in beams:
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 im = ax1.imshow(hi_reprojected, cmap='gray_r', origin='lower')
-                                ax1.contour(hi_reprojected, cmap='Oranges_r', linewidth=0.8,
-                                            levels=[rms * 3, rms * 5, rms * 10, rms * 20, rms * 40])  # , rms * 80]
+                                ax1.contour(hi_reprojected, cmap='Oranges_r', linewidths=0.8,
+                                            levels=sensitivity*2**np.range(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='white', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
