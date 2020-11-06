@@ -77,22 +77,24 @@ H0 = 70.
 
 cube_name = 'HI_image_cube'
 
-header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
-          'logMhi', 'SJyHz', 'redshift', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
-          'flag', 'rms', 'w20', 'w50', 'kin_pa', 'taskid', 'beam', 'cube']
+header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'err_x', 'err_y', 'err_z',
+          'logMhi', 'SJyHz', 'SJyHz_err', 'redshift', 'reds_err', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
+          'flag', 'flag_kh', 'rms', 'w20', 'w50', 'kin_pa', 'taskid', 'beam', 'cube']
 
 catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
                "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
-               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "taskid", "beam", "cube",
-               "SJyHz", "logMhi", "redshift", "v_sys", "D_Lum", "rms_spec", "SNR")
-catParUnits = ["-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
+               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "err_x", "err_y", "err_z", "err_f_sum", "taskid", "beam", "cube",
+               "SJyHz", "SJyHz_err", "logMhi", "redshift", "reds_err", "v_sys", "D_Lum", "rms_spec", "SNR", "flag_kh")
+
+catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
                "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "Jy/beam", "km/s", "km/s", "pix", "pix", "pix",
-               "pix", "pix", "deg", "deg", "-", "-", "-",
-               "Jy*Hz", "log(M_Sun)", "-", "km/s", "Mpc", "Jy/chan", "-"]
+               "pix", "pix", "deg", "deg", "pix", "pix", "pix", "Jy/beam", "-", "-", "-",
+               "Jy*Hz", "Jy*Hz", "log(M_Sun)", "-", "-", "km/s", "Mpc", "Jy/chan", "-", "-")
+
 catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
-               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i",
-               "%13.6f", "%12.6f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f")
+               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%12.6f", "%10i", "%7i", "%7i",
+               "%13.6f", "%13.6f", "%12.6f", "%11.7f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f", "%7i")
 
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
@@ -146,7 +148,8 @@ for b in beams:
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
 
-                SJyHz, logMhi, redshift, v_sys, D_Lum, rms_spec, SNR, w50, w20, src_name = [], [], [], [], [], [], [], [], [], []
+                SJyHz, SJyHz_err, logMhi, redshift, redshift_err, v_sys = [], [], [], [], [], []
+                D_Lum, rms_spec, SNR, w50, w20, src_name, flag_kh = [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -182,7 +185,7 @@ for b in beams:
                     Ysize = ((YmaxNew - YminNew) * hi_cellsize).to(u.arcmin)
                     opt_view = 6. * u.arcmin
                     if (Xsize > opt_view) | (Ysize > opt_view):
-                        opt_view = np.max([Xsize.value, Ysize.value]) * 0.52 * u.arcmin
+                        opt_view = np.max([Xsize.value, Ysize.value]) * 0.55 * u.arcmin
 
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
@@ -210,6 +213,10 @@ for b in beams:
                     w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_sys).to(u.km/u.s).value)
                     v_sys.append(freq_sys.to(u.km/u.s, equivalencies=optical_HI).value)
                     redshift.append(HI_restfreq / freq_sys - 1.)
+                    try:
+                        redshift_err.append((HI_restfreq / freq_sys**2 ) * obj[cathead == "err_z"][0] * chan_width)
+                    except:
+                        redshift_err.append(0.0)
                     cosmo = cosmocalc(redshift[-1], H0)
                     D_Lum.append(cosmo['DL_Mpc'])
                     Mhi = 49.7 * SJyHz[-1] * cosmo['DL_Mpc']**2
@@ -218,6 +225,7 @@ for b in beams:
                     specmask[int(Zmin):int(Zmax)] = 1
                     rms_spec.append(np.std(spectrum[specmask == 0]))
                     SNR.append(signal / (rms_spec[-1] * np.sqrt(Zmax - Zmin)))
+                    SJyHz_err.append((rms_spec[-1] * np.sqrt(Zmax - Zmin)) * chan_width.value / pix_per_beam)
 
                     # Generate some flags based on AAS filter (1) or continuum filtering (2)
                     flag = 0
@@ -228,6 +236,7 @@ for b in beams:
                     if np.sum(result * mask2d) > 0:
                         flag += 2
                         print("\tSpatial filtering flag")
+                    flag_kh.append(flag)
 
                     # Determine HI position of galaxy & therefore source name
                     subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
@@ -340,8 +349,8 @@ for b in beams:
                                 ax1.tick_params(axis='both', which='major', labelsize=18)
                                 ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                                # ax1.text(0.5, 0.05, '1, 2, 3, 4, 6, 8 * $\Sigma$', ha='center', va='center',
-                                #          transform=ax1.transAxes, fontsize=18)
+                                ax1.text(0.5, 0.05, "N_HI = {:.1f}e+19".format(nhi19), ha='center', va='center',
+                                         transform=ax1.transAxes, fontsize=18)
                                 ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
                                                       width=(bmin / opt_view).decompose(), angle=bpa,
                                                       transform=ax1.transAxes, facecolor='gold',
@@ -495,12 +504,15 @@ for b in beams:
 
                 # Add derived parameters for objects in cube to then be written to catalog:
                 cat['SJyHz'] = SJyHz
+                cat['SJyHz_err'] = SJyHz_err
                 cat['logMhi'] = logMhi
                 cat['redshift'] = redshift
+                cat['reds_err'] = redshift_err
                 cat['v_sys'] = v_sys
                 cat['D_Lum'] = D_Lum
                 cat['rms_spec'] = rms_spec
                 cat['SNR'] = SNR
+                cat['flag_kh'] = flag_kh
 
                 # Replace these for their km/s values instead of pixel values (Catalog units hard coded above).
                 cat['w50'] = w50

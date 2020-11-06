@@ -113,17 +113,17 @@ alta_dir = '/altaZone/archive/apertif_main/visibilities_default/'
 
 header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'n_pix',
           'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50', 'ell_maj', 'ell_min', 'ell_pa',
-          'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa', 'taskid', 'beam', 'cube']
+          'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa', "err_x", "err_y", "err_z", "err_f_sum", 'taskid', 'beam', 'cube']
 
 catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
                "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
-               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "taskid", "beam", "cube")
+               "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "err_x", "err_y", "err_z", "err_f_sum", "taskid", "beam", "cube")
 catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
                "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "Jy/beam", "chan", "chan", "pix", "pix", "pix",
-               "pix", "pix", "deg", "deg", "-", "-", "-")
+               "pix", "pix", "deg", "deg", "pix", "pix", "pix", "Jy/beam", "-", "-", "-")
 catParFormt = ("%12s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
-               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10i", "%7i", "%7i")
+               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%12.6f", "%10i", "%7i", "%7i")
 prepare = apercal.prepare()
 
 for b in beams:
@@ -339,10 +339,11 @@ for b in beams:
             catalog['taskid'] = np.int(taskid.replace('/', ''))
             catalog['beam'] = b
             catalog['cube'] = c
+            # Not sure that I've actually reordered anything.  This might be hold over that I gave up on:
             catalog_reorder = catalog['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max',
                                       'n_pix', 'f_min', 'f_max', 'f_sum', 'rel', 'flag', 'rms', 'w20', 'w50',
                                       'ell_maj', 'ell_min', 'ell_pa', 'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa',
-                                      'taskid', 'beam', 'cube']
+                                      "err_x", "err_y", "err_z", "err_f_sum", 'taskid', 'beam', 'cube']
 
             if args.sources == 'all':
                 sources = [str(s+1) for s in range(len(catalog))]
