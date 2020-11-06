@@ -141,7 +141,6 @@ for b in beams:
                 hi_cellsize = hdu_clean[0].header['CDELT2'] * 3600. * u.arcsec
                 pix_per_beam = bmaj/hi_cellsize * bmin/hi_cellsize * np.pi / (4 * np.log(2))
                 chan_width = hdu_clean[0].header['CDELT3'] * u.Hz
-                opt_view = 6. * u.arcmin
                 opt_pixels = 900
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
@@ -178,6 +177,12 @@ for b in beams:
                     if YmaxNew > cubeDim[1] - 1: YmaxNew = cubeDim[1] - 1
                     ZmaxNew = cPixZNew + maxZ
                     if ZmaxNew > cubeDim[0] - 1: ZmaxNew = cubeDim[0] - 1
+
+                    Xsize = ((XmaxNew - XminNew) * hi_cellsize).to(u.arcmin)
+                    Ysize = ((YmaxNew - YminNew) * hi_cellsize).to(u.arcmin)
+                    opt_view = 6. * u.arcmin
+                    if (Xsize > opt_view) | (Ysize > opt_view):
+                        opt_view = np.max([Xsize.value, Ysize.value]) * 0.52 * u.arcmin
 
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
