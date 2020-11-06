@@ -243,22 +243,22 @@ for b in beams:
                         os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
                     new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
 
-                    # Get optical image
-                    path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
-                                              survey=['DSS2 Blue'], pixels=opt_pixels)
+                    # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
+                    if (not os.path.isfile(new_outname + '_mom0.png')) | (
+                            not os.path.isfile(new_outname + '_mom0hi.png')) | (
+                            not os.path.isfile(new_outname + '_signif.png')) | (
+                            not os.path.isfile(new_outname + '_mom1.png')):
 
-                    if len(path) != 0:
-                        print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
-                        # Get optical image and HI subimage for object
-                        hdulist_opt = path[0]
-                        d2 = hdulist_opt[0].data
-                        h2 = hdulist_opt[0].header
+                        # Get optical image
+                        path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
+                                                  survey=['DSS2 Blue'], pixels=opt_pixels)
 
-                        # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
-                        if (not os.path.isfile(new_outname + '_mom0.png')) | (
-                                not os.path.isfile(new_outname + '_mom0hi.png')) | (
-                                not os.path.isfile(new_outname + '_signif.png')) | (
-                                not os.path.isfile(new_outname + '_mom1.png')):
+                        if len(path) != 0:
+                            print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
+                            # Get optical image and HI subimage for object
+                            hdulist_opt = path[0]
+                            d2 = hdulist_opt[0].data
+                            h2 = hdulist_opt[0].header
 
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
@@ -401,9 +401,10 @@ for b in beams:
                                 fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
                                 mom1.close()
 
-                        hdulist_opt.close()
-                    else:
-                        print("\tWARNING: No optical image found, so no moment-related png's produced")
+                            hdulist_opt.close()
+
+                        else:
+                            print("\tWARNING: No optical image found, so no moment-related png's produced")
 
                     # Make pv plot for object
                     if not os.path.isfile(new_outname + '_pv.png'):
