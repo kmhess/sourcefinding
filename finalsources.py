@@ -182,8 +182,8 @@ for b in beams:
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
                     freqmax = chan2freq(Zmax, hdu_pb)
-                    velmax = freqmin.to(u.km/u.s, equivalencies=optical_HI).value
-                    velmin = freqmax.to(u.km/u.s, equivalencies=optical_HI).value
+                    velmax = freqmin.to(u.km/u.s, equivalencies=optical_HI).value + 5
+                    velmin = freqmax.to(u.km/u.s, equivalencies=optical_HI).value - 5
                     kinpa = obj[cathead == "kin_pa"][0] * u.deg
                     rms_sofia = obj[cathead == "rms"][0]
 
@@ -251,8 +251,10 @@ for b in beams:
 
                         # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
                         if (not os.path.isfile(new_outname + '_mom0.png')) | (
-                        not os.path.isfile(new_outname + '_mom0hi.png')) | (
-                        not os.path.isfile(new_outname + '_signif.png')):
+                                not os.path.isfile(new_outname + '_mom0hi.png')) | (
+                                not os.path.isfile(new_outname + '_signif.png')) | (
+                                not os.path.isfile(new_outname + '_mom1.png')):
+
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
@@ -262,11 +264,13 @@ for b in beams:
                             hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
                             mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
                             significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
-                            sensitivity = np.median(hi_reprojected[(significance>=2)*(significance<=3)])
-                            nhi19 = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19 # 1 sigma
-                            print("\t1sig N_HI is {}e+19".format(nhi19))
-                            nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
-                                        "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
+                            sensitivity = np.percentile(hi_reprojected[(significance>=2)*(significance<=3)], 20)
+                            nhi19_old = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19 # 1 sigma
+                            nhi19 = 2.33e20 * sensitivity / (bmaj.value * bmin.value) / 1e19
+                            print("\t1sig N_HI is {}e+19. Lowest contour is {}e+19.".format(nhi19_old,nhi19))
+                            # nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
+                            #             "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
+                            nhi_label = "N_HI = {:.1f}, {:.1f}, {:.0f}, {:.0f}e+19".format(nhi19 * 1, nhi19 * 2, nhi19 * 4, nhi19 * 8)
 
                             # Overlay HI contours on optical image
                             if not os.path.isfile(new_outname + '_mom0.png'):
@@ -274,8 +278,7 @@ for b in beams:
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
-                                ax1.contour(hi_reprojected, cmap='Oranges', linewidths=0.8,
-                                            levels=sensitivity*2**np.range(10))
+                                ax1.contour(hi_reprojected, cmap='Oranges', linewidths=1, levels=sensitivity*2**np.arange(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
@@ -297,8 +300,7 @@ for b in beams:
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 im = ax1.imshow(hi_reprojected, cmap='gray_r', origin='lower')
-                                ax1.contour(hi_reprojected, cmap='Oranges_r', linewidths=0.8,
-                                            levels=sensitivity*2**np.range(10))
+                                ax1.contour(hi_reprojected, cmap='Oranges_r', linewidths=1.2, levels=sensitivity*2**np.arange(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='white', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
@@ -319,22 +321,22 @@ for b in beams:
 
                             # Make HI significance image
                             if not os.path.isfile(new_outname + '_signif.png'):
-                                wa_cmap = colors.ListedColormap(['w','b','g','yellow','orange','r'])
+                                wa_cmap = colors.ListedColormap(['w','royalblue','limegreen','yellow','orange','r'])
                                 boundaries = [0,1,2,3,4,5,6]
                                 norm = colors.BoundaryNorm(boundaries, wa_cmap.N, clip=True)
                                 print("[FINALSOURCES] Making HI significance image for source {}".format(new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
                                 ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
                                 im = ax1.imshow(significance, cmap=wa_cmap, origin='lower', norm=norm)
-                                ax1.contour(hi_reprojected, linewidths=0.7,levels=[sensitivity,],colors=['k',])
+                                ax1.contour(hi_reprojected, linewidths=2, levels=[sensitivity, ], colors=['k', ])
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
                                 ax1.set_title(src_name[-1], fontsize=20)
                                 ax1.tick_params(axis='both', which='major', labelsize=18)
                                 ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                                ax1.text(0.5, 0.05, '1, 2, 3, 4, 6, 8 * $\Sigma$', ha='center', va='center',
-                                         transform=ax1.transAxes, fontsize=18)
+                                # ax1.text(0.5, 0.05, '1, 2, 3, 4, 6, 8 * $\Sigma$', ha='center', va='center',
+                                #          transform=ax1.transAxes, fontsize=18)
                                 ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
                                                       width=(bmin / opt_view).decompose(), angle=bpa,
                                                       transform=ax1.transAxes, facecolor='gold',
@@ -346,51 +348,54 @@ for b in beams:
                                 fig.savefig(new_outname + '_signif.png', bbox_inches='tight')
                             hdulist_hi.close()
 
-                        # Make velocity map for object
-                        if not os.path.isfile(new_outname + '_mom1.png'):
-                            print("[FINALSOURCES] Making velocity map for source {}".format(new_outname.split("/")[-1]))
-                            mom1 = fits.open(new_outname + '_mom1.fits')
-                            for i in range(mom1[0].data.shape[0]):
-                                for j in range(mom1[0].data.shape[1]):
-                                    mom1[0].data[i][j] = (mom1[0].data[i][j] * u.Hz).to(u.km/u.s, equivalencies=optical_HI).value
-                                    # Set crazy mom1 values to nan:
-                                    if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
-                                        mom1[0].data[i][j] = np.nan
-                            mom1_reprojected, footprint = reproject_interp(mom1, h2)
-                            v_sys_label = "v_sys = {}   W_50 = {}  W_20 = {}".format(int(v_sys[-1]), int(w50[-1]), int(w20[-1]))
-                            fig = plt.figure(figsize=(8, 8))
-                            ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                            im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax, origin='lower')
-                            if velmax - velmin > 200:
-                                levels = [v_sys[-1] - 100, v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50, v_sys[-1] + 100]
-                                clevels = ['white', 'gray', 'black', 'gray', 'white']
-                            else:
-                                levels = [v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50]
-                                clevels = ['lightgray', 'black', 'lightgray']
-                            ax1.contour(mom1_reprojected, colors=clevels, levels=levels, linewidths=0.6)
-                            # Plot HI center of galaxy
-                            ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
-                                        transform=ax1.get_transform('fk5'))
-                            ax1.plot([(hi_pos.ra + 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
-                                      (hi_pos.ra - 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg],
-                                     [(hi_pos.dec + 0.5*opt_view * np.cos(kinpa)).deg, (hi_pos.dec - 0.5*opt_view * np.cos(kinpa)).deg],
-                                     c='black', linestyle='--', linewidth=0.75, transform=ax1.get_transform('fk5'))
-                            # ax1.scatter([(hi_pos.ra + 0.6 * opt_view * np.sin(kinpa)).deg],[]
-                            ax1.set_title(src_name[-1], fontsize=20)
-                            ax1.tick_params(axis='both', which='major', labelsize=18)
-                            ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
-                            ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
-                            ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
-                                     color='black', fontsize=18)
-                            ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
-                                                  width=(bmin / opt_view).decompose(), angle=bpa,
-                                                  transform=ax1.transAxes, edgecolor='steelblue', linewidth=1))
-                            if flag != 0: plot_flags(flag, ax1)
-                            cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
-                            cbar = fig.colorbar(im, cax=cb_ax)
-                            cbar.set_label("Velocity [km/s]", fontsize=18)
-                            fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
-                            mom1.close()
+                            # Make velocity map for object
+                            if not os.path.isfile(new_outname + '_mom1.png'):
+                                print("[FINALSOURCES] Making velocity map for source {}".format(new_outname.split("/")[-1]))
+                                mom1 = fits.open(new_outname + '_mom1.fits')
+                                for i in range(mom1[0].data.shape[0]):
+                                    for j in range(mom1[0].data.shape[1]):
+                                        mom1[0].data[i][j] = (mom1[0].data[i][j] * u.Hz).to(u.km/u.s, equivalencies=optical_HI).value
+                                        # Set crazy mom1 values to nan:
+                                        if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
+                                            mom1[0].data[i][j] = np.nan
+                                mom1_reprojected, footprint = reproject_interp(mom1, h2)
+                                mom1_reprojected[significance<2.0] = np.nan
+                                v_sys_label = "v_sys = {}   W_50 = {}  W_20 = {}".format(int(v_sys[-1]), int(w50[-1]), int(w20[-1]))
+                                fig = plt.figure(figsize=(8, 8))
+                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax, origin='lower')
+                                ax1.contour(hi_reprojected, linewidths=1, levels=[sensitivity, ], colors=['k', ])
+                                if velmax - velmin > 200:
+                                    levels = [v_sys[-1] - 100, v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50, v_sys[-1] + 100]
+                                    clevels = ['white', 'gray', 'black', 'gray', 'white']
+                                else:
+                                    levels = [v_sys[-1] - 50, v_sys[-1], v_sys[-1] + 50]
+                                    clevels = ['lightgray', 'black', 'lightgray']
+                                ax1.contour(mom1_reprojected, colors=clevels, levels=levels, linewidths=0.6)
+                                # Plot HI center of galaxy
+                                ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
+                                            transform=ax1.get_transform('fk5'))
+                                ax1.plot([(hi_pos.ra + 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
+                                          (hi_pos.ra - 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg],
+                                         [(hi_pos.dec + 0.5*opt_view * np.cos(kinpa)).deg, (hi_pos.dec - 0.5*opt_view * np.cos(kinpa)).deg],
+                                         c='black', linestyle='--', linewidth=0.75, transform=ax1.get_transform('fk5'))
+                                # ax1.scatter([(hi_pos.ra + 0.6 * opt_view * np.sin(kinpa)).deg],[]
+                                ax1.set_title(src_name[-1], fontsize=20)
+                                ax1.tick_params(axis='both', which='major', labelsize=18)
+                                ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                                ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                                ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
+                                         color='black', fontsize=18)
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
+                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                                      transform=ax1.transAxes, edgecolor='steelblue', linewidth=1))
+                                if flag != 0: plot_flags(flag, ax1)
+                                cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
+                                cbar = fig.colorbar(im, cax=cb_ax)
+                                cbar.set_label("Velocity [km/s]", fontsize=18)
+                                fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
+                                mom1.close()
+
                         hdulist_opt.close()
                     else:
                         print("\tWARNING: No optical image found, so no moment-related png's produced")
