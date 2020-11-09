@@ -181,11 +181,11 @@ for b in beams:
                     ZmaxNew = cPixZNew + maxZ
                     if ZmaxNew > cubeDim[0] - 1: ZmaxNew = cubeDim[0] - 1
 
-                    Xsize = ((XmaxNew - XminNew) * hi_cellsize).to(u.arcmin)
-                    Ysize = ((YmaxNew - YminNew) * hi_cellsize).to(u.arcmin)
+                    Xsize = ((Xmax - Xmin) * hi_cellsize).to(u.arcmin)
+                    Ysize = ((Ymax - Ymin) * hi_cellsize).to(u.arcmin)
                     opt_view = 6. * u.arcmin
                     if (Xsize > opt_view) | (Ysize > opt_view):
-                        opt_view = np.max([Xsize.value, Ysize.value]) * 0.55 * u.arcmin
+                        opt_view = np.max([Xsize.value, Ysize.value]) * 1.05 * u.arcmin
 
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
@@ -532,7 +532,6 @@ for b in beams:
                 # Write out new or update catalog on a per cube basis:
                 print("[FINALSOURCES] Updating HI final_cat.txt for Beam {:02} Cube {} in taskid directory".format(b, c))
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc[:-5] + 'final_cat.txt')
-                # write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName='final_cat.txt')
 
                 # Close all related cube files
                 hdu_clean.close()
