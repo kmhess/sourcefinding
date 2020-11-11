@@ -54,7 +54,9 @@ input.invert               =  false
 
 # Flagging
 
-flag.region                =  
+flag.region                =
+flag.catalog               =
+flag.radius                =  0
 flag.auto                  =  false
 flag.threshold             =  5.0
 flag.radiusSpatial         =  0
