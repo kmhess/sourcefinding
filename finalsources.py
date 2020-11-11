@@ -181,11 +181,12 @@ for b in beams:
                     ZmaxNew = cPixZNew + maxZ
                     if ZmaxNew > cubeDim[0] - 1: ZmaxNew = cubeDim[0] - 1
 
-                    Xsize = ((Xmax - Xmin) * hi_cellsize).to(u.arcmin)
-                    Ysize = ((Ymax - Ymin) * hi_cellsize).to(u.arcmin)
+                    Xsize = np.array([((Xmax - Xc) * hi_cellsize).to(u.arcmin).value, ((Xc - Xmin) * hi_cellsize).to(u.arcmin).value])
+                    Ysize = np.array([((Ymax - Yc) * hi_cellsize).to(u.arcmin).value, ((Yc - Ymin) * hi_cellsize).to(u.arcmin).value])
                     opt_view = 6. * u.arcmin
-                    if (Xsize > opt_view) | (Ysize > opt_view):
-                        opt_view = np.max([Xsize.value, Ysize.value]) * 1.05 * u.arcmin
+                    if np.any(Xsize > opt_view.value/2) | np.any(Ysize > opt_view.value/2):
+                        opt_view = np.max([Xsize, Ysize])*2 * 1.05 * u.arcmin
+                        print("\tOptical image bigger than default. Now {:.2f} arcmin".format(opt_view.value))
 
                     # Do some prep for mom1 maps:
                     freqmin = chan2freq(Zmin, hdu_pb)
