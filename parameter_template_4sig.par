@@ -97,7 +97,7 @@ spatFilter.boxcar          =  0
 # S+C finder
 
 scfind.enable              =  true
-scfind.kernelsXY           =  0, 3, 6, 8
+scfind.kernelsXY           =  0, 3, 6
 scfind.kernelsZ            =  0, 3, 7
 scfind.threshold           =  4.0
 scfind.replacement         =  2.0
@@ -120,17 +120,17 @@ linker.radiusXY            =  2
 linker.radiusZ             =  3
 linker.minSizeXY           =  5
 linker.minSizeZ            =  5
-linker.maxSizeXY           =  0
-linker.maxSizeZ            =  0
+linker.maxSizeXY           =  200
+linker.maxSizeZ            =  140
 linker.keepNegative        =  false
 
 
 # Reliability
 
 reliability.enable         =  true
-reliability.threshold      =  0.9
+reliability.threshold      =  0.95
 reliability.scaleKernel    =  0.5
-reliability.fmin           =  20.0
+reliability.fmin           =  16.0
 reliability.plot           =  true
 
 

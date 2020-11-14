@@ -21,6 +21,8 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     os.system('grep -vwE "(output.filename)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
     if cube == 3:
         os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
+        os.system('grep -vwE "(linker.maxSizeXY)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
+        os.system('grep -vwE "(linker.maxSizeZ)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
 
     # Add back the parameters needed
     if not args.nospline:
@@ -33,6 +35,8 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
     os.system('echo "output.filename            =  ' + outroot + '" >> ' + new_paramfile)
     if cube == 3:
         os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
+        os.system('echo "linker.maxSizeXY           =  250" >> ' + new_paramfile)
+        os.system('echo "linker.maxSizeZ            =  385" >> ' + new_paramfile)
 
     return new_paramfile, outlog
 
