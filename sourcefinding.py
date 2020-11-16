@@ -23,6 +23,7 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
         os.system('grep -vwE "(flag.region)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
         os.system('grep -vwE "(linker.maxSizeXY)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
         os.system('grep -vwE "(linker.maxSizeZ)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
+        # os.system('grep -vwE "(scfind.kernelsXY)" ' + new_paramfile + ' > temp && mv temp ' + new_paramfile)
 
     # Add back the parameters needed
     if not args.nospline:
@@ -37,6 +38,7 @@ def make_param_file(sig=4, loc_dir=None, cube_name=None, cube=None):
         os.system('echo "flag.region                =  0,661,0,661,375,601" >> ' + new_paramfile)
         os.system('echo "linker.maxSizeXY           =  250" >> ' + new_paramfile)
         os.system('echo "linker.maxSizeZ            =  385" >> ' + new_paramfile)
+        # os.system('echo "scfind.kernelsXY           = 0, 3, 6, 8" >> ' + new_paramfile)
 
     return new_paramfile, outlog
 
@@ -225,9 +227,14 @@ for b in beams:
             print("\tBeam {:02} Cube {} is not present in this directory.".format(b, c))
             continue
 
-        print("[SOURCEFINDING] Doing source finding with 4 sigma threshold.")
         sig = 4
         new_paramfile, outlog = make_param_file(sig=sig, loc_dir=loc, cube_name=cube_name, cube=c)
+        try:
+            os.system('rm -rf ' + loc + cube_name + '*_4sig_*.fits '+ loc + cube_name + '*_4sig_cat.txt')
+            print("[SOURCEFINDING] Cleaning up old mask and catalog files before source finding.")
+        except:
+            pass
+        print("[SOURCEFINDING] Doing source finding with 4 sigma threshold.")
         os.system('/home/apercal/SoFiA-2/sofia ' + new_paramfile + ' >> ' + outlog)
 
     # After all cubes are done, run checkmasks to get summary plots for cleaning:
