@@ -12,6 +12,7 @@
 import os
 
 from astropy.io import fits as pyfits
+import astropy.units as u
 import numpy as np
 from apercal.libs import lib
 
@@ -19,18 +20,33 @@ from modules import beam_lookup
 
 
 # ------------------------------------------------
+def get_cb_model_freq():
+	"""
+	Set the central frequency for the Gaussian regression beams based on the Apertif DR1 documentation.
+	"""
+	alexander_orig_dr1 = 1361.25 * u.MHz
+	return alexander_orig_dr1
+
+
 def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	"""
 	Find appropriate beam model and set center to center of image.
+	Rescale the beam model to appropriate size for the center frequency of the cube.
 	Regrid the beam model image in miriad to the HI image.
 	Expand beam model imagine in 3D.
 	"""
 
 	# Change the reference pixel of beam model to reference pixel of image to correct
-	cb_model = beam_lookup.model_lookup(taskid, b)
+	cb_model = beam_lookup.model_lookup2(taskid, b)
 	hdulist_cb = pyfits.open(cb_model)
 	hdulist_cb[0].header['CRVAL1'] = hdu_image[0].header['CRVAL1']
 	hdulist_cb[0].header['CRVAL2'] = hdu_image[0].header['CRVAL2']
+
+	# Rescale to appropriate frequency. This should work for either drift scans or Gaussian regression (only tested on latter):
+	avg_cube_freq = (hdu_image[0].header['CRVAL3'] + hdu_image[0].header['CDELT3'] * hdu_image[0].data.shape[0]) * u.Hz
+	hdulist_cb[0].header['CDELT1'] = (hdulist_cb[0].header['CDELT1'] * get_cb_model_freq().to(u.Hz) / avg_cube_freq).value
+	hdulist_cb[0].header['CDELT2'] = (hdulist_cb[0].header['CDELT2'] * get_cb_model_freq().to(u.Hz) / avg_cube_freq).value
+
 	cb2d_name = 'temp_b{}_c{}_cb-2d.fits'.format(b, c)
 	hdulist_cb.writeto(cb2d_name)
 	hdulist_cb.close()
@@ -70,7 +86,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	d_beam_cube = d_new * hdu_cb[0].data
 	hdu_cb[0].data = np.float32(d_beam_cube)
 
-	print('\tWriting beam cube.')
+	print('\tWriting compound beam cube.')
 	hdu_cb.writeto('{}_cb.fits'.format(image_name[:-5]))
 
 	hdu_cb.close()
