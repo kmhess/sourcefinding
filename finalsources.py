@@ -267,7 +267,7 @@ for b in beams:
                     if (not os.path.isfile(new_outname + '_mom0.png')) | (
                             not os.path.isfile(new_outname + '_mom0hi.png')) | (
                             not os.path.isfile(new_outname + '_signif.png')) | (
-                            not os.path.isfile(new_outname + '_mom1.png')):
+                            not os.path.isfile(new_outname + '_posmom1.png')):
 
                         # Get optical image
                         path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
@@ -374,9 +374,9 @@ for b in beams:
                             hdulist_hi.close()
 
                             # Make velocity map for object
-                            if not os.path.isfile(new_outname + '_mom1.png'):
+                            if not os.path.isfile(new_outname + '_posmom1.png'):
                                 print("[FINALSOURCES] Making velocity map for source {}".format(new_outname.split("/")[-1]))
-                                mom1 = fits.open(new_outname + '_mom1.fits')
+                                mom1 = fits.open(new_outname + '_posmom1.fits')
                                 for i in range(mom1[0].data.shape[0]):
                                     for j in range(mom1[0].data.shape[1]):
                                         mom1[0].data[i][j] = (mom1[0].data[i][j] * u.Hz).to(u.km/u.s, equivalencies=optical_HI).value
@@ -418,7 +418,7 @@ for b in beams:
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
                                 cbar.set_label("Velocity [km/s]", fontsize=18)
-                                fig.savefig(new_outname + '_mom1.png', bbox_inches='tight')
+                                fig.savefig(new_outname + '_posmom1.png', bbox_inches='tight')
                                 mom1.close()
 
                             hdulist_opt.close()
