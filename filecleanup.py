@@ -68,7 +68,8 @@ for b in beams:
         filter_name = loc + cube_name + "_filtered.fits"
         filter2d_name = loc + cube_name + "_filtered-2d.fits"
 
-        if os.path.isfile(loc + cube_name + '_4sig_mask-2d.fits') & (not os.path.isfile(loc + cube_name + '_filtered-2d.fits')):
+        if os.path.isfile(loc + cube_name + '_4sig_mask-2d.fits') & (not os.path.isfile(filter2d_name)):
+            print("[FILECLEANUP] Making {}".format(filter2d_name))
             os.system("cp " + loc + cube_name + "_4sig_mask-2d.fits " + filter2d_name)
             # Open the necessary files
             hdu_filter2d = fits.open(filter2d_name, mode = 'update')
