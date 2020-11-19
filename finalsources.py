@@ -80,24 +80,27 @@ H0 = 70.
 
 cube_name = 'HI_image_cube'
 
-header = ['name', 'id', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'err_x', 'err_y', 'err_z',
-          'logMhi', 'SJyHz', 'SJyHz_err', 'redshift', 'reds_err', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
-          'flag', 'flag_kh', 'rms', 'w20', 'w50', 'kin_pa', 'taskid', 'beam', 'cube']
+header = ['name', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'err_x', 'err_y', 'err_z',
+          'logMhi', 'SJyHz', 'SJyHz_err', 'f_sum', 'err_f_sum', 'n_pix', 'redshift', 'reds_err', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
+          'flag', 'flag_kh', 'rms', 'w20', 'w50', 'kin_pa', 'bmaj', 'bmin', 'bpa', 'pix_beam', 'taskid', 'beam', 'cube', 'id']
 
 catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
                "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
                "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "err_x", "err_y", "err_z", "err_f_sum", "taskid", "beam", "cube",
-               "SJyHz", "SJyHz_err", "logMhi", "redshift", "reds_err", "v_sys", "D_Lum", "rms_spec", "SNR", "flag_kh")
+               "SJyHz", "SJyHz_err", "logMhi", "redshift", "reds_err", "v_sys", "D_Lum", "rms_spec", "SNR", "flag_kh",
+               "bmaj", "bmin", "bpa", "pix_beam")
 
 catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
                "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "Jy/beam", "km/s", "km/s", "pix", "pix", "pix",
                "pix", "pix", "deg", "deg", "pix", "pix", "pix", "Jy/beam", "-", "-", "-",
-               "Jy*Hz", "Jy*Hz", "log(M_Sun)", "-", "-", "km/s", "Mpc", "Jy/chan", "-", "-")
+               "Jy*Hz", "Jy*Hz", "log(M_Sun)", "-", "-", "km/s", "Mpc", "Jy/chan", "-", "-",
+               "arcsec", "arcsec", "deg", "pix/beam")
 
 catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
-               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%12.6f", "%10i", "%7i", "%7i",
-               "%13.6f", "%13.6f", "%12.6f", "%11.7f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f", "%7i")
+               "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%8.3f", "%8.3f", "%8.3f", "%12.6f", "%10i", "%7i", "%7i",
+               "%13.6f", "%13.6f", "%12.6f", "%11.7f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f", "%7i",
+               "%9.3f", "%9.3f", "%9.3f", "%10.3f")
 
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
@@ -144,11 +147,16 @@ for b in beams:
                                       outname, loc, False, False)
 
                 # Get beam size and cell size
-                bmaj = hdu_clean[0].header['BMAJ'] * 3600. * u.arcsec
-                bmin = hdu_clean[0].header['BMIN'] * 3600. * u.arcsec
-                bpa = hdu_clean[0].header['BPA']
+                bmaj, bmin, bpa, pix_beam = [], [], [], []
+                bmajor = hdu_clean[0].header['BMAJ'] * 3600. * u.arcsec
+                bmaj.append(bmajor.value)
+                bminor = hdu_clean[0].header['BMIN'] * 3600. * u.arcsec
+                bmin.append(bminor.value)
+                bposangle = hdu_clean[0].header['BPA']
+                bpa.append(bposangle)
                 hi_cellsize = hdu_clean[0].header['CDELT2'] * 3600. * u.arcsec
-                pix_per_beam = bmaj/hi_cellsize * bmin/hi_cellsize * np.pi / (4 * np.log(2))
+                pix_per_beam = bmajor / hi_cellsize * bminor / hi_cellsize * np.pi / (4 * np.log(2))
+                pix_beam.append(pix_per_beam)
                 chan_width = hdu_clean[0].header['CDELT3'] * u.Hz
                 opt_pixels = 900
 
@@ -290,8 +298,8 @@ for b in beams:
                             mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
                             significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
                             sensitivity = np.percentile(hi_reprojected[(significance>=2)*(significance<=3)], 20)
-                            nhi19_old = 2.33e20 * rms / (bmaj.value * bmin.value) / 1e19 # 1 sigma
-                            nhi19 = 2.33e20 * sensitivity / (bmaj.value * bmin.value) / 1e19
+                            nhi19_old = 2.33e20 * rms / (bmajor.value * bminor.value) / 1e19 # 1 sigma
+                            nhi19 = 2.33e20 * sensitivity / (bmajor.value * bminor.value) / 1e19
                             print("\t1sig N_HI is {}e+19. Lowest contour is {}e+19.".format(nhi19_old,nhi19))
                             # nhi_label = "N_HI = {:.1f}, {:.1f}, {:.1f}, {:.0f}, " \
                             #             "{:.0f}e+19".format(nhi19 * 3, nhi19 * 5, nhi19 * 10, nhi19 * 20, nhi19 * 40) #, nhi19 * 80)
@@ -312,8 +320,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='white', fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj/opt_view).decompose(),
-                                                      width=(bmin/opt_view).decompose(), angle=bpa, transform=ax1.transAxes,
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
+                                                      width=(bminor / opt_view).decompose(), angle=bposangle, transform=ax1.transAxes,
                                                       edgecolor='white', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
@@ -334,8 +342,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
                                          fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
-                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
+                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
                                                       transform=ax1.transAxes, facecolor='darkorange',
                                                       edgecolor='black', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
@@ -362,8 +370,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, "N_HI = {:.1f}e+19".format(nhi19), ha='center', va='center',
                                          transform=ax1.transAxes, fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(),
-                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
+                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
                                                       transform=ax1.transAxes, facecolor='gold',
                                                       edgecolor='indigo', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
@@ -411,8 +419,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='black', fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmaj / opt_view).decompose(), facecolor='gray',
-                                                      width=(bmin / opt_view).decompose(), angle=bpa,
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(), facecolor='gray',
+                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
                                                       transform=ax1.transAxes, edgecolor='steelblue', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
@@ -466,7 +474,7 @@ for b in beams:
                         ascii.write([cube_frequencies, spectrum],
                                     new_outname + '_specfull.txt',
                                     names=['Frequency [Hz]', 'Flux [Jy/beam*pixel]'])
-                        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmaj, bmin,
+                        os.system('echo "# BMAJ = {}\n# BMIN = {}\n# CELLSIZE = {:.2f}" > temp'.format(bmajor, bminor,
                                                                                                        hi_cellsize))
                         os.system('cat temp ' + new_outname + '_specfull.txt' +
                                   ' > temp2 && mv temp2 ' + new_outname + '_specfull.txt')
@@ -524,6 +532,10 @@ for b in beams:
                 cat['rms_spec'] = rms_spec
                 cat['SNR'] = SNR
                 cat['flag_kh'] = flag_kh
+                cat['bmaj'] = bmaj
+                cat['bmin'] = bmin
+                cat['bpa'] = bpa
+                cat['pix_beam'] = pix_beam
 
                 # Replace these for their km/s values instead of pixel values (Catalog units hard coded above).
                 cat['w50'] = w50
