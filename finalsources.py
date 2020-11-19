@@ -164,7 +164,7 @@ for b in beams:
                 cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
 
                 SJyHz, SJyHz_err, logMhi, redshift, redshift_err, v_sys = [], [], [], [], [], []
-                D_Lum, rms_spec, SNR, w50, w20, src_name, flag_kh = [], [], [], [], [], [], []
+                D_Lum, rms_spec, SNR, w50, w20, src_name, flag_kh, f_sum = [], [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
                     cubeDim = hdu_clean[0].data.shape
@@ -245,6 +245,9 @@ for b in beams:
                     rms_spec.append(np.std(spectrum[specmask == 0]))
                     SNR.append(signal / (rms_spec[-1] * np.sqrt(Zmax - Zmin)))
                     SJyHz_err.append((rms_spec[-1] * np.sqrt(Zmax - Zmin)) * chan_width.value / pix_per_beam)
+                    # Re-calculate SoFiA f_sum (keep f_sum_err the same); previous was based on dirty un-repaired map
+                    subsubcube = subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
+                    f_sum.append(np.nansum(subsubcube[submask != 0]))
 
                     # Generate some flags based on AAS filter (1) or continuum filtering (2)
                     flag = 0
@@ -292,7 +295,6 @@ for b in beams:
                             # Reproject HI data & calculate contour properties
                             hi_reprojected, footprint = reproject_interp(hdulist_hi, h2)
                             # Calculate noise over narrower range to avoid bad spws
-                            subsubcube = subcube[int(ZminNew):int(ZmaxNew) + 1, :, :]
                             rms = np.nanstd(subsubcube[submask == 0]) * chan_width.value
                             hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
                             mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
@@ -536,6 +538,7 @@ for b in beams:
                 cat['bmin'] = bmin
                 cat['bpa'] = bpa
                 cat['pix_beam'] = pix_beam
+                cat['f_sum'] = f_sum
 
                 # Replace these for their km/s values instead of pixel values (Catalog units hard coded above).
                 cat['w50'] = w50
