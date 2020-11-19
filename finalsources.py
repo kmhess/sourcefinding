@@ -29,7 +29,10 @@ from sofia import cubelets
 # For testing nearness of spatial issues:
 # https://stackoverflow.com/questions/10996769/pixel-neighbors-in-2d-array-image-using-python
 def test_mask(value):
-    test = np.any(np.isnan(value))
+    if len(hdu_filter[0].data.shape) > 2:
+        test = np.any(np.isnan(value))
+    else:
+        test = np.any(value > 0)
     return test
 
 
@@ -115,7 +118,11 @@ for b in beams:
                 else:
                     hdu_clean = fits.open(loc + cube_name + '{}_{}.fits'.format(c, clean_name))
                 hdu_mask3d = fits.open(loc + cube_name + '{}_4sig_mask.fits'.format(c))
-                hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
+                # Use filtered-2d.fits first if it exists:
+                if os.path.isfile(loc + cube_name + '{}_filtered-2d.fits'.format(c)):
+                    hdu_filter = fits.open(loc + cube_name + '{}_filtered-2d.fits'.format(c))
+                else:
+                    hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
                 pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)
                 hdu_pb = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
@@ -202,7 +209,10 @@ for b in beams:
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
                     # Create subimage of the continuum filtering to raise flag if it affects source
-                    filter2d = hdu_filter[0].data[0, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+                    if len(hdu_filter[0].data.shape) > 2:
+                        filter2d = hdu_filter[0].data[0, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
+                    else:
+                        filter2d = hdu_filter[0].data[int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
 
                     # Calculate spectrum and some fundamental galaxy parameters
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
@@ -468,8 +478,8 @@ for b in beams:
                         spectrumJy = spectrum / pix_per_beam
                         cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
                         optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
-                        maskmin = chan2freq(Zmin, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
-                        maskmax = chan2freq(Zmax, hdu=hdu_filter).to(u.km / u.s, equivalencies=optical_HI).value
+                        maskmin = chan2freq(Zmin, hdu=hdu_clean).to(u.km / u.s, equivalencies=optical_HI).value
+                        maskmax = chan2freq(Zmax, hdu=hdu_clean).to(u.km / u.s, equivalencies=optical_HI).value
                         fig = plt.figure(figsize=(15, 4))
                         ax_spec = fig.add_subplot(111)
                         ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
