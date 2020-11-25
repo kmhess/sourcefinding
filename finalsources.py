@@ -463,10 +463,10 @@ for b in beams:
                         ax2 = ax1.twinx()
                         vel1 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq1 - 1)
                         vel2 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq2 - 1)
-                        ax2.set_ylim(vel1, vel2)
+                        ax2.set_ylim(vel2, vel1)
                         ax2.set_ylabel('Velocity [km/s]')
                         ax1.text(0.5, 0.05, 'Kinematic PA = {:5.1f} deg'.format(kinpa.value), ha='center', va='center',
-                                 transform=ax1.transAxes, color='white', fontsize=18)
+                                 transform=ax1.transAxes, color='orange', fontsize=18)
                         fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
                         pv.close()
 
