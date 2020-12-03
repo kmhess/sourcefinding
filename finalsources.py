@@ -142,7 +142,7 @@ for b in beams:
                         obj.append(s)
                     objects.append(obj[1:])
                 objects = np.array(objects)
-                print("[FINALSOURCES] Making cubelets for sources in clean_cat.txt Beam {:02} Cube {}".format(b, c))
+                print("[FINALSOURCES] Making cubelets for sources in {}_cat.txt Beam {:02} Cube {}".format(clean_name, b, c))
                 cubelets.writeSubcube(hdu_pb[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
                                       outname, loc, False, False)
 
@@ -442,11 +442,11 @@ for b in beams:
                         pv = fits.open(new_outname + '_pv.fits')
                         wcs_pv = WCS(pv[0].header)
                         ang1, freq1 = wcs_pv.wcs_pix2world(0, 0, 0)
-                        ang2, freq2 = wcs_pv.wcs_pix2world(pv[0].header['NAXIS1'], pv[0].header['NAXIS2'], 0)
+                        ang2, freq2 = wcs_pv.wcs_pix2world(pv[0].header['NAXIS1']-1, pv[0].header['NAXIS2']-1, 0)
                         pv_rms = np.nanstd(pv[0].data)
                         fig = plt.figure(figsize=(8, 8))
                         ax1 = fig.add_subplot(111, projection=WCS(pv[0].header))
-                        ax1.imshow(pv[0].data, cmap='gray')
+                        ax1.imshow(pv[0].data, cmap='gray', aspect='auto')
                         if np.all(np.isnan(pv[0].data)): continue
                         ax1.contour(pv[0].data, colors='black', levels=[-2*pv_rms, 2*pv_rms, 4*pv_rms])
                         ax1.autoscale(False)
