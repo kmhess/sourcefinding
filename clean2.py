@@ -251,12 +251,12 @@ for b in beams:
             # Output what exactly is being used to clean the data
             print("\t{}".format(maskfits))
             # Edit mask cube to trick Miriad into using the whole volume.
-            # m = pyfits.open(maskfits, mode='update')
-            # m[0].data[0, 0, 0] = -1
-            # m[0].data[-1, -1, -1] = -1
-            # m[0].scale('int16')
-            # m.flush()
-            # m.close()
+            m = pyfits.open(maskfits, mode='update')
+            m[0].data[0, 0, 0] = -1
+            m[0].data[-1, -1, -1] = -1
+            m[0].scale('int16')
+            m.flush()
+            m.close()
 
             # Delete any pre-existing Miriad files.
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
@@ -307,7 +307,7 @@ for b in beams:
             restor = lib.miriad('restor')  # Create the restored image
             for minc in range(nminiter):
                 print("[CLEAN] Clean & restor HI emission using SoFiA mask for Sources {}.".format(args.sources))
-                for chan in range(1168,1205,1):
+                for chan in range(1190,1195,1):
                     for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
                         imsub = lib.miriad('imsub')
                         imsub.in_ = name
@@ -315,42 +315,41 @@ for b in beams:
                         imsub.region = '"images({})"'.format(chan+1)
                         imsub.go()
 
-                    try:
-                        # print("[CLEAN] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
-                        clean.map = 'map_{:02}_{:04}'.format(minc, chan)
-                        clean.beam = 'beam_{:02}_{:04}'.format(minc, chan)
-                        clean.out = 'model_{:02}_{:04}'.format(minc+1, chan)
-                        clean.cutoff = lineimagestats[2] * 0.5
-                        clean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan)
-                        clean.go()
+                    clean.map = 'map_{:02}_{:04}'.format(minc, chan)
+                    clean.beam = 'beam_{:02}_{:04}'.format(minc, chan)
+                    clean.out = 'model_{:02}_{:04}'.format(minc+1, chan)
+                    clean.cutoff = lineimagestats[2] * 0.5
+                    clean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan)
+                    clean.go()
 
-                        # print("[CLEAN] Restoring line cube.")
-                        restor.model = 'model_{:02}_{:04}'.format(minc+1, chan)
-                        restor.beam = 'beam_{:02}_{:04}'.format(minc, chan)
-                        restor.map = 'map_{:02}_{:04}'.format(minc, chan)
-                        restor.out = 'image_{:02}_{:04}'.format(minc+1, chan)
-                        restor.mode = 'clean'
-                        restor.go()
+                    # print("[CLEAN] Restoring line cube.")
+                    restor.model = 'model_{:02}_{:04}'.format(minc+1, chan)
+                    restor.beam = 'beam_{:02}_{:04}'.format(minc, chan)
+                    restor.map = 'map_{:02}_{:04}'.format(minc, chan)
+                    restor.out = 'image_{:02}_{:04}'.format(minc+1, chan)
+                    restor.mode = 'clean'
+                    restor.go()
 
-                        # print("[CLEAN] Making residual cube.")
-                        restor.mode = 'residual'  # Create the residual image
-                        restor.out = loc + 'residual_{:02}_{:04}'.format(minc+1, c)
-                        restor.go()
+                    # print("[CLEAN] Making residual cube.")
+                    restor.mode = 'residual'  # Create the residual image
+                    restor.out = loc + 'residual_{:02}_{:04}'.format(minc+1, chan)
+                    restor.go()
 
-                        for name,newcube in zip(['model_{:02}_{:04}'.format(minc+1, chan), 'image_{:02}_{:04}'.format(minc+1, chan),
-                                     'residual_{:02}_{:04}'.format(minc+1, chan)],
-                                        [mod_nancube, cl_nancube, res_nancube]):
-                            fits.op = 'xyout'
-                            fits.in_ = name
-                            fits.out = name + '.fits'
-                            fits.go()
+                    for name in ['model_{:02}_{:04}'.format(minc+1, chan), 'image_{:02}_{:04}'.format(minc+1, chan),
+                                 'residual_{:02}_{:04}'.format(minc+1, chan)]:
+                        fits.op = 'xyout'
+                        fits.in_ = name
+                        fits.out = name + '.fits'
+                        fits.go()
 
-                        cl_cube[chan,:,:] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc+1, chan))
-                        mod_cube[chan,:,:] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc+1, chan))
-                        res_cube[chan,:,:] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc+1, chan))
-                        writeto = True
-                    except:
-                        pass
+                    cl_cube[chan,:,:] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc+1, chan))
+                    model_im = pyfits.open('model_{:02}_{:04}.fits'.format(minc + 1, chan))
+                    crp1, crp2 = int(model_im[0].header['CRPIX1']), int(model_im[0].header['CRPIX2'])
+                    nax1, nax2 = int(model_im[0].header['NAXIS1']), int(model_im[0].header['NAXIS2'])
+                    mod_cube[chan, crp2:crp2+nax2, crp1:crp1+nax1] = model_im[0].data
+                    model_im.close()
+                    res_cube[chan,:,:] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc+1, chan))
+                    writeto = True
 
             if args.nospline:
                 outcube = line_cube[:-5]
