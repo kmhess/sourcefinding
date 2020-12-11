@@ -60,6 +60,75 @@ def run(i):
     except Exception:
         print("[ERROR] Something went wrong with the Spline fitting [" + str(i) + "]")
         return np.nan
+
+
+def worker2(inQueue, outQueue):
+
+    """
+    Defines the worker process of the parallelisation with multiprocessing.Queue
+    and multiprocessing.Process.
+    """
+    for i in iter(inQueue.get, 'STOP'):
+
+        status = run2(i)
+
+        outQueue.put(( status ))
+
+
+def run2(i):
+    global new_cleancube_data, new_residualcube_data
+
+    try:
+        for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
+            imsub = lib.miriad('imsub')
+            imsub.in_ = name
+            imsub.out = name + "_" + str(chan[i]).zfill(4)
+            imsub.region = '"images({})"'.format(chan[i] + 1)
+            imsub.go()
+
+        # print("[CLEAN] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
+        clean.map = 'map_{:02}_{:04}'.format(minc, chan[i])
+        clean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
+        clean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
+        clean.cutoff = lineimagestats[2] * 0.5
+        clean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
+        clean.go()
+
+        # print("[CLEAN] Restoring line cube.")
+        restor.model = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
+        restor.map = 'map_{:02}_{:04}'.format(minc, chan[i])
+        restor.out = 'image_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.mode = 'clean'
+        restor.go()
+
+        # print("[CLEAN] Making residual cube.")
+        restor.mode = 'residual'  # Create the residual image
+        restor.out = loc + 'residual_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.go()
+
+        for name in ['model_{:02}_{:04}'.format(minc + 1, chan[i]), 'image_{:02}_{:04}'.format(minc + 1, chan[i]),
+                 'residual_{:02}_{:04}'.format(minc + 1, chan[i])]:
+            fits.op = 'xyout'
+            fits.in_ = name
+            fits.out = name + '.fits'
+            fits.go()
+
+        new_cleancube_data[chan[i], :, :] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        # new_modelcube_data[chan[i], :, :] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        # # model_im = pyfits.open('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        # # crp1, crp2 = np.int(model_im[0].header['CRPIX1']), np.int(model_im[0].header['CRPIX2'])
+        # # nax1, nax2 = np.int(model_im[0].header['NAXIS1']), np.int(model_im[0].header['NAXIS2'])
+        # # mod_cube_data[chan[i], crp2:crp2+nax2, crp1:crp1+nax1] = model_im[0].data
+        # # model_im.close()
+        new_residualcube_data[chan[i], :, :] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+
+        return 'OK'
+
+    except Exception:
+        print("[ERROR] Something went wrong with the cleaning! [Channel {}]".format(chan[i]))
+        return np.nan
+
 ###################################################################
 
 parser = ArgumentParser(description="Do source finding in the HI spectral line cubes for a given taskid, beam, cubes",
@@ -290,116 +359,113 @@ for b in beams:
             maths.mask = mask_expr
             maths.go()
 
-            # Initialize clean, model, and residual cubes
             print("[CLEAN] Initialize clean, model, and residual cubes")
             if args.nospline:
-                dirty_cube = pyfits.open(line_cube)
+                dirty_cube = line_cube
+                outcube = line_cube[:-5]
             else:
-                dirty_cube = pyfits.open(new_splinefits)
-            cl_cube = np.copy(dirty_cube[0].data)
-            mod_cube = np.full(dirty_cube[0].data.shape, np.nan, dtype='float32')
-            res_cube = np.copy(dirty_cube[0].data)
-            # dirty_cube.close()
+                dirty_cube = new_splinefits
+                outcube = line_cube[:-5] + '_rep'
 
-            writeto = False
+            new_cleanfits = outcube + '_clean.fits'
+            os.system('cp {} {}'.format(dirty_cube, new_cleanfits))
+            print("\t{}".format(new_cleanfits))
+            new_cleancube = pyfits.open(new_cleanfits, mode='update')
+            new_cleancube_data = new_cleancube[0].data
+
+            # new_modelfits = outcube + '_clean.fits'
+            # os.system('cp {} {}'.format(dirty_cube, new_modelfits))
+            # print("\t{}".format(new_modelfits))
+            # new_modelcube = pyfits.open(new_modelfits, mode='update')
+            # new_modelcube_data = new_modelcube[0].data * np.nan
+
+            new_residualfits = outcube + '_residual.fits'
+            os.system('cp {} {}'.format(dirty_cube, new_residualfits))
+            print("\t{}".format(new_residualfits))
+            new_residualcube = pyfits.open(new_residualfits, mode='update')
+            new_residualcube_data = new_residualcube[0].data
+
+            # Get channels to clean explicitly!
+            chan = []
+            for s in sources:
+                zmin, zmax = np.int(catalog[catalog['id'] == np.int(s)]['z_min']), \
+                             np.int(catalog[catalog['id'] == np.int(s)]['z_max'])
+                chan = chan + [c for c in range(zmin, zmax+1, 1)]
+            chan = set(chan)
+            chan = list(chan)
+            print(chan)
+
             nminiter = 1
             clean = lib.miriad('clean')
             restor = lib.miriad('restor')  # Create the restored image
             for minc in range(nminiter):
                 print("[CLEAN] Clean & restor HI emission using SoFiA mask for Sources {}.".format(args.sources))
-                for chan in range(1190,1195,1):
-                    for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
-                        imsub = lib.miriad('imsub')
-                        imsub.in_ = name
-                        imsub.out = name + "_" + str(chan).zfill(4)
-                        imsub.region = '"images({})"'.format(chan+1)
-                        imsub.go()
 
-                    clean.map = 'map_{:02}_{:04}'.format(minc, chan)
-                    clean.beam = 'beam_{:02}_{:04}'.format(minc, chan)
-                    clean.out = 'model_{:02}_{:04}'.format(minc+1, chan)
-                    clean.cutoff = lineimagestats[2] * 0.5
-                    clean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan)
-                    clean.go()
+                ################################################
+                # Parallelization of cleaning/restoring
+                ncases = len(chan)
+                print(" - " + str(ncases) + " cases found")
 
-                    # print("[CLEAN] Restoring line cube.")
-                    restor.model = 'model_{:02}_{:04}'.format(minc+1, chan)
-                    restor.beam = 'beam_{:02}_{:04}'.format(minc, chan)
-                    restor.map = 'map_{:02}_{:04}'.format(minc, chan)
-                    restor.out = 'image_{:02}_{:04}'.format(minc+1, chan)
-                    restor.mode = 'clean'
-                    restor.go()
+                if njobs > 1:
+                    print(" - Running in parallel mode (" + str(njobs) + " jobs simultaneously)")
+                elif njobs == 1:
+                    print(" - Running in serial mode")
+                else:
+                    print("[ERROR] invalid number of NJOBS. Please use a positive number.")
+                    exit()
 
-                    # print("[CLEAN] Making residual cube.")
-                    restor.mode = 'residual'  # Create the residual image
-                    restor.out = loc + 'residual_{:02}_{:04}'.format(minc+1, chan)
-                    restor.go()
+                # Managing the work PARALLEL or SERIAL accordingly
+                if njobs > cpu_count():
+                    print(
+                        "  [WARNING] The chosen number of NJOBS seems to be larger than the number of CPUs in the system!")
 
-                    for name in ['model_{:02}_{:04}'.format(minc+1, chan), 'image_{:02}_{:04}'.format(minc+1, chan),
-                                 'residual_{:02}_{:04}'.format(minc+1, chan)]:
-                        fits.op = 'xyout'
-                        fits.in_ = name
-                        fits.out = name + '.fits'
-                        fits.go()
+                # Create Queues
+                print("    - Creating Queues")
+                inQueue = Queue()
+                outQueue = Queue()
 
-                    cl_cube[chan,:,:] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc+1, chan))
-                    model_im = pyfits.open('model_{:02}_{:04}.fits'.format(minc + 1, chan))
-                    crp1, crp2 = int(model_im[0].header['CRPIX1']), int(model_im[0].header['CRPIX2'])
-                    nax1, nax2 = int(model_im[0].header['NAXIS1']), int(model_im[0].header['NAXIS2'])
-                    mod_cube[chan, crp2:crp2+nax2, crp1:crp1+nax1] = model_im[0].data
-                    model_im.close()
-                    res_cube[chan,:,:] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc+1, chan))
-                    writeto = True
+                # Create worker2 processes
+                print("    - Creating worker2 processes")
+                ps = [Process(target=worker2, args=(inQueue, outQueue)) for _ in range(njobs)]
 
-            if args.nospline:
-                outcube = line_cube[:-5]
-            else:
-                outcube = line_cube[:-5] + '_rep_'
+                # Start worker2 processes
+                print("    - Starting worker2 processes")
+                for p in ps: p.start()
 
-            if writeto == True:
-                print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
-                pyfits.writeto(outcube + '_clean.fits', cl_cube, dirty_cube[0].header)
-                pyfits.writeto(outcube + '_model.fits', mod_cube, dirty_cube[0].header)
-                pyfits.writeto(outcube + '_residual.fits', res_cube, dirty_cube[0].header)
-            else:
-                print("\tSomething went wrong, no clean/model/residual cube produced")
-            dirty_cube.close()
+                # Fill the queue
+                print("    - Filling up the queue")
+                for i in trange(ncases):
+                    inQueue.put((i))
+
+                # Now running the processes
+                print("    - Running the processes")
+                output = [outQueue.get() for _ in trange(ncases)]
+
+                # Send stop signal to stop iteration
+                for _ in range(njobs): inQueue.put('STOP')
+
+                # Stop processes
+                print("    - Stopping processes")
+                for p in ps: p.join()
+
+                print(" - Updating the clean file")
+                new_cleancube.data = new_cleancube_data
+                new_cleancube.flush()
+                new_cleancube.close()
+
+                print(" - Updating the residual file")
+                new_residualcube.data = new_residualcube_data
+                new_residualcube.flush()
+                new_residualcube.close()
+                ################################################
 
             # Output sofia only mask????
+            print("[CLEAN] Writing mask with only cleaned sources")
             fits.op = 'xyout'
             fits.in_ = 'mask_' + str(minc).zfill(2)
             if not args.nospline:
                 fits.out = outcube + '_mask.fits'
                 fits.go()
-
-            # if overwrite:
-            #     os.system('rm {}_clean.fits {}_residual.fits {}_model.fits'.format(line_cube[:-5], line_cube[:-5],
-            #                                                                        line_cube[:-5]))
-            #     print("\tWARNING...overwrite won't delete clean_cat.txt file.  Manage this carefully!")
-            #
-            # print("[CLEAN] Writing out cleaned image, residual, and model to FITS.")
-            # fits.op = 'xyout'
-            # fits.in_ = 'image_' + str(minc + 1).zfill(2)
-            # if args.nospline:
-            #     fits.out = line_cube[:-5] + '_clean.fits'
-            # else:
-            #     fits.out = line_cube[:-5] + '_rep_clean.fits'
-            # fits.go()
-            #
-            # fits.op = 'xyout'
-            # fits.in_ = loc + 'residual_' + str(minc + 1).zfill(2)
-            # if args.nospline:
-            #     fits.out = line_cube[:-5] + '_residual.fits'
-            # else:
-            #     fits.out = line_cube[:-5] + '_rep_residual.fits'
-            # fits.go()
-            #
-            # fits.in_ = loc + 'model_' + str(minc + 1).zfill(2)
-            # if args.nospline:
-            #     fits.out = line_cube[:-5] + '_model.fits'
-            # else:
-            #     fits.out = line_cube[:-5] + '_rep_model.fits'
-            # fits.go()
 
             catalog = ascii.read(catalog_file, header_start=10)
             catalog['taskid'] = np.int(taskid.replace('/', ''))
@@ -411,12 +477,8 @@ for b in beams:
                                       'ell_maj', 'ell_min', 'ell_pa', 'ell3s_maj', 'ell3s_min', 'ell3s_pa', 'kin_pa',
                                       "err_x", "err_y", "err_z", "err_f_sum", 'taskid', 'beam', 'cube']
 
-            # IS THIS A DUPLICATE?  WHY IS IT HERE?
-            # if args.sources == 'all':
-            #     sources = [str(s+1) for s in range(len(catalog))]
-
             # If everything was successful and didn't crash for a given beam/cube:
-            # Copy SoFiA catalog for *cleaned* sources to clean_cat.txt (Same for all cubes in a beam).
+            # Copy SoFiA catalog for *cleaned* sources to [rep_]clean_cat.txt (Same for all cubes in a beam).
             objects = []
             for source in catalog_reorder:
                 if str(source['id']) in sources:
@@ -433,7 +495,7 @@ for b in beams:
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc + 'rep_clean_cat.txt')
 
             # Clean up extra Miriad files
-            # os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
+            os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
 
     # Will probably need to do some sorting of the catalog if run clean multiple times.  This is a starting point:
     # os.system('head -n +1 {} > temp'.format(clean_catalog))
