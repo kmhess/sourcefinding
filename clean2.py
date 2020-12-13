@@ -456,12 +456,21 @@ for b in beams:
             new_residualcube.data = new_residualcube_data
 
             print("[CLEAN2] Updating history of reassembled clean,[model,]residual cubes")
-            for i in range(len(chan)):
+            clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
+            residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
+            for hist in clean_chan_hdr[-41:]['HISTORY']:  # Determined through trial and error
+                new_cleancube[0].header['HISTORY'] = hist
+            for hist in residual_chan_hdr[-41:]['HISTORY']:
+                new_residualcube[0].header['HISTORY'] = hist
+            bmaj_arr[0] = clean_chan_hdr['BMAJ']
+            bmin_arr[0] = clean_chan_hdr['BMIN']
+            bpa_arr[0] = clean_chan_hdr['BPA']
+            for i in range(1,len(chan)):
                 clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
                 residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-                for hist in clean_chan_hdr[-41:]['HISTORY']:  # Determined through trial and error
+                for hist in clean_chan_hdr[-35:]['HISTORY']:  # Determined through trial and error
                     new_cleancube[0].header['HISTORY'] = hist
-                for hist in residual_chan_hdr[-41:]['HISTORY']:  # Determined through trial and error
+                for hist in residual_chan_hdr[-35:]['HISTORY']:
                     new_residualcube[0].header['HISTORY'] = hist
                 bmaj_arr[i] = clean_chan_hdr['BMAJ']
                 bmin_arr[i] = clean_chan_hdr['BMIN']
