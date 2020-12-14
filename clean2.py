@@ -73,8 +73,7 @@ def worker2(inQueue, outQueue):
 
 
 def run2(i):
-    global new_cleancube_data, new_residualcube_data
-    # global new_cleancube_data, new_modelcube_data, new_residualcube_data
+    global new_cleancube_data, new_modelcube_data, new_residualcube_data
 
     # try:
     for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
@@ -84,15 +83,15 @@ def run2(i):
         imsub.region = '"images({})"'.format(chan[i] + 1)
         imsub.go()
 
-    # print("[CLEAN] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
-    clean.map = 'map_{:02}_{:04}'.format(minc, chan[i])
-    clean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
-    clean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
-    clean.cutoff = lineimagestats[2] * 0.5
-    clean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
-    clean.go()
+    # print("[CLEAN2] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
+    klean.map = 'map_{:02}_{:04}'.format(minc, chan[i])
+    klean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
+    klean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
+    klean.cutoff = lineimagestats[2] * 0.5
+    klean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
+    klean.go()
 
-    # print("[CLEAN] Restoring line cube.")
+    # print("[CLEAN2] Restoring line cube.")
     restor.model = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
     restor.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
     restor.map = 'map_{:02}_{:04}'.format(minc, chan[i])
@@ -100,21 +99,25 @@ def run2(i):
     restor.mode = 'clean'
     restor.go()
 
-    # print("[CLEAN] Making residual cube.")
-    restor.mode = 'residual'  # Create the residual image
-    restor.out = loc + 'residual_{:02}_{:04}'.format(minc + 1, chan[i])
-    restor.go()
+    # print("[CLEAN2] Making residual cube.")
+    out_array = ['image_{:02}_{:04}'.format(minc + 1, chan[i])]
+    if args.all:
+        restor.mode = 'residual'  # Create the residual image
+        restor.out = loc + 'residual_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.go()
+        out_array = ['model_{:02}_{:04}'.format(minc + 1, chan[i]), 'image_{:02}_{:04}'.format(minc + 1, chan[i]),
+             'residual_{:02}_{:04}'.format(minc + 1, chan[i])]
 
-    for name in ['model_{:02}_{:04}'.format(minc + 1, chan[i]), 'image_{:02}_{:04}'.format(minc + 1, chan[i]),
-             'residual_{:02}_{:04}'.format(minc + 1, chan[i])]:
+    for name in out_array:
         fits.op = 'xyout'
         fits.in_ = name
         fits.out = name + '.fits'
         fits.go()
 
     new_cleancube_data[chan[i], :, :] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-    # new_modelcube_data[chan[i], :, :] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-    new_residualcube_data[chan[i], :, :] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+    if args.all:
+        new_modelcube_data[chan[i], :, :] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        new_residualcube_data[chan[i], :, :] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
 
     return 'OK'
 
@@ -150,6 +153,10 @@ parser.add_argument('-o', "--overwrite",
 parser.add_argument('-j', "--njobs",
                     help="Number of jobs to run in parallel (default: %(default)s) tested on happili-05.",
                     default=18)
+
+parser.add_argument('-a', "--all",
+                    help="Write residuall and model cubes as well as the cleaned cubes.",
+                    action='store_true')
 
 # Parse the arguments above
 args = parser.parse_args()
@@ -295,13 +302,13 @@ for b in beams:
 
             if args.nospline:
                 f = pyfits.open(filteredfits)
-                print("[CLEAN] Determining the statistics from the filtered Beam {:02}, Cube {}.".format(b, c))
+                print("[CLEAN2] Determining the statistics from the filtered Beam {:02}, Cube {}.".format(b, c))
             elif os.path.isfile(splinefits):
                 f = pyfits.open(splinefits)
-                print("[CLEAN] Determining the statistics from the filtered & spline fitted Beam {:02}, Cube {}.".format(b, c))
+                print("[CLEAN2] Determining the statistics from the filtered & spline fitted Beam {:02}, Cube {}.".format(b, c))
             else:
                 f = pyfits.open(new_splinefits)
-                print("[CLEAN] Determining the statistics from the repaired Beam {:02}, Cube {}.".format(b, c))
+                print("[CLEAN2] Determining the statistics from the repaired Beam {:02}, Cube {}.".format(b, c))
             nchan = f[0].data.shape[0]
             mask = np.ones(nchan, dtype=bool)
             if c == 3: mask[376:662] = False
@@ -322,7 +329,7 @@ for b in beams:
             # Delete any pre-existing Miriad files.
             os.system('rm -rf model_* beam_* map_* image_* mask_* residual_*')
 
-            print("[CLEAN] Reading in FITS files, making Miriad mask.")
+            print("[CLEAN2] Reading in FITS files, making Miriad mask.")
 
             fits = lib.miriad('fits')
             fits.op = 'xyin'
@@ -334,7 +341,7 @@ for b in beams:
             fits.go()
 
             if not os.path.isfile(beam_cube):
-                print("[CLEAN] Retrieving synthesized beam cube from ALTA.")
+                print("[CLEAN2] Retrieving synthesized beam cube from ALTA.")
                 os.system('iget {}{}_AP_B0{:02}/HI_beam_cube{}.fits {}'.format(alta_dir, taskid, b, c, loc))
             fits.in_ = beam_cube
             fits.out = 'beam_00'
@@ -351,7 +358,10 @@ for b in beams:
             maths.mask = mask_expr
             maths.go()
 
-            print("[CLEAN] Initialize clean, model, and residual cubes")
+            if args.all:
+                print("[CLEAN2] Initialize clean, model, and residual cubes")
+            else:
+                print("[CLEAN2] Initialize clean cube")
             if args.nospline:
                 dirty_cube = line_cube
                 outcube = line_cube[:-5]
@@ -365,17 +375,22 @@ for b in beams:
             new_cleancube = pyfits.open(new_cleanfits, mode='update')
             new_cleancube_data = new_cleancube[0].data
 
-            # new_modelfits = outcube + '_clean.fits'
-            # os.system('cp {} {}'.format(dirty_cube, new_modelfits))
-            # print("\t{}".format(new_modelfits))
-            # new_modelcube = pyfits.open(new_modelfits, mode='update')
-            # new_modelcube_data = new_modelcube[0].data * np.nan
+            if args.all:
+                new_modelfits = outcube + '_model.fits'
+                os.system('cp {} {}'.format(dirty_cube, new_modelfits))
+                pre_model = pyfits.open(new_modelfits, mode='update')
+                pre_model[0].data = pre_model[0].data * np.nan
+                pre_model.flush()
+                pre_model.close()
+                print("\t{}".format(new_modelfits))
+                new_modelcube = pyfits.open(new_modelfits, mode='update')
+                new_modelcube_data = new_modelcube[0].data
 
-            new_residualfits = outcube + '_residual.fits'
-            os.system('cp {} {}'.format(dirty_cube, new_residualfits))
-            print("\t{}".format(new_residualfits))
-            new_residualcube = pyfits.open(new_residualfits, mode='update')
-            new_residualcube_data = new_residualcube[0].data
+                new_residualfits = outcube + '_residual.fits'
+                os.system('cp {} {}'.format(dirty_cube, new_residualfits))
+                print("\t{}".format(new_residualfits))
+                new_residualcube = pyfits.open(new_residualfits, mode='update')
+                new_residualcube_data = new_residualcube[0].data
 
             # Get channels to clean explicitly!
             chan = []
@@ -390,7 +405,7 @@ for b in beams:
             bpa_arr = np.zeros(len(chan))
 
             nminiter = 1
-            clean = lib.miriad('clean')
+            klean = lib.miriad('klean')
             restor = lib.miriad('restor')  # Create the restored image
             for minc in range(nminiter):
                 print("[CLEAN2] Clean & restor HI emission using SoFiA mask for Sources {}.".format(args.sources))
@@ -447,31 +462,50 @@ for b in beams:
             print(" - Updating the clean file")
             new_cleancube.data = new_cleancube_data
 
-            # print(" - Updating the model file")
-            # new_modelcube.data = new_modelcube_data
-            # new_modelcube.flush()
-            # new_modelcube.close()
+            if args.all:
+                print(" - Updating the model file")
+                new_modelcube.data = new_modelcube_data
+                print(" - Updating the residual file")
+                new_residualcube.data = new_residualcube_data
 
-            print(" - Updating the residual file")
-            new_residualcube.data = new_residualcube_data
+                print("[CLEAN2] Updating history of reassembled model, residual, clean cubes")
+                residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
+                model_chan_hdr = pyfits.getheader('model_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
+                for hist in residual_chan_hdr[-41:]['HISTORY']:
+                    new_residualcube[0].header['HISTORY'] = hist
+                for hist in model_chan_hdr[-32:]['HISTORY']:
+                    new_modelcube[0].header['HISTORY'] = hist
+                for i in range(1, len(chan)):
+                    residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+                    model_chan_hdr = pyfits.getheader('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+                    for hist in residual_chan_hdr[-35:]['HISTORY']:
+                        new_residualcube[0].header['HISTORY'] = hist
+                    for hist in model_chan_hdr[-26:]['HISTORY']:
+                        new_modelcube[0].header['HISTORY'] = hist
+                new_residualcube[0].header['HISTORY'] = 'Individual images reassembled using sourcefinding/clean2.py by KMHess'
+                new_modelcube[0].header['HISTORY'] = 'Individual images reassembled using sourcefinding/clean2.py by KMHess'
 
-            print("[CLEAN2] Updating history of reassembled clean,[model,]residual cubes")
+                print(" - Saving the new model file")
+                new_modelcube.flush()
+                new_modelcube.close()
+
+                print(" - Saving the new residual file")
+                new_residualcube.flush()
+                new_residualcube.close()
+
+            else:
+                print("[CLEAN2] Updating history of reassembled clean cube")
+
             clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
-            residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
             for hist in clean_chan_hdr[-41:]['HISTORY']:  # Determined through trial and error
                 new_cleancube[0].header['HISTORY'] = hist
-            for hist in residual_chan_hdr[-41:]['HISTORY']:
-                new_residualcube[0].header['HISTORY'] = hist
             bmaj_arr[0] = clean_chan_hdr['BMAJ']
             bmin_arr[0] = clean_chan_hdr['BMIN']
             bpa_arr[0] = clean_chan_hdr['BPA']
             for i in range(1,len(chan)):
                 clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-                residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
                 for hist in clean_chan_hdr[-35:]['HISTORY']:  # Determined through trial and error
                     new_cleancube[0].header['HISTORY'] = hist
-                for hist in residual_chan_hdr[-35:]['HISTORY']:
-                    new_residualcube[0].header['HISTORY'] = hist
                 bmaj_arr[i] = clean_chan_hdr['BMAJ']
                 bmin_arr[i] = clean_chan_hdr['BMIN']
                 bpa_arr[i] = clean_chan_hdr['BPA']
@@ -496,10 +530,6 @@ for b in beams:
             print(" - Saving the new clean file")
             new_cleancube.flush()
             new_cleancube.close()
-
-            print(" - Saving the new residual file")
-            new_residualcube.flush()
-            new_residualcube.close()
 
             # Output sofia only mask????
             print("[CLEAN2] Writing mask with only cleaned sources")
