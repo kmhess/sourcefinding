@@ -327,9 +327,13 @@ for b in beams:
                             if args.panstarrs:
                                 d2 = hdulist_panstarrs[0].data
                                 h2 = hdulist_panstarrs[0].header
+                                patch_height = (bmajor / pstar_opt_view).decompose()
+                                patch_width = (bminor / pstar_opt_view).decompose()
                             else:
                                 d2 = hdulist_dss2[0].data
                                 h2 = hdulist_dss2[0].header
+                                patch_height = (bmajor / opt_view).decompose()
+                                patch_width = (bminor / opt_view).decompose()
 
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
@@ -367,14 +371,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='white', fontsize=18)
-                                if args.panstarrs:
-                                    ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / pstar_opt_view).decompose(),
-                                                          width=(bminor / pstar_opt_view).decompose(), angle=bposangle,
-                                                          transform=ax1.transAxes, edgecolor='white', linewidth=1))
-                                else:
-                                    ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
-                                                          width=(bminor / opt_view).decompose(), angle=bposangle,
-                                                          transform=ax1.transAxes, edgecolor='white', linewidth=1))
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=patch_height, width=patch_width, angle=bposangle,
+                                                      transform=ax1.transAxes, edgecolor='white', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
 
@@ -394,10 +392,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
                                          fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
-                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
-                                                      transform=ax1.transAxes, facecolor='darkorange',
-                                                      edgecolor='black', linewidth=1))
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=patch_height, width=patch_width, angle=bposangle,
+                                                      transform=ax1.transAxes, facecolor='darkorange', edgecolor='black', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
@@ -422,10 +418,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, "N_HI = {:.1f}e+19".format(nhi19), ha='center', va='center',
                                          transform=ax1.transAxes, fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
-                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
-                                                      transform=ax1.transAxes, facecolor='gold',
-                                                      edgecolor='indigo', linewidth=1))
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=patch_height, width=patch_width, angle=bposangle,
+                                                      transform=ax1.transAxes, facecolor='gold', edgecolor='indigo', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
@@ -479,9 +473,8 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='black', fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(), facecolor='gray',
-                                                      width=(bminor / opt_view).decompose(), angle=bposangle,
-                                                      transform=ax1.transAxes, edgecolor='steelblue', linewidth=1))
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=patch_height, width=patch_width, angle=bposangle,
+                                                      transform=ax1.transAxes, edgecolor='darkgray', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
