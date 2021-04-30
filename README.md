@@ -56,31 +56,32 @@ Output:
 
 ### Step 3: finalsources.py
 ```
-python finalsources.py -t <taskid> -b <beams> -c <cubes>
+python finalsources.py -t <taskid> -b <beams> -c <cubes> -p <optionally graps panstarrs images (4') instead of DSS2 (6' & adjustable)>
 ```
 Same defaults as above.  
 Uses SoFiA-1 `writecubelets` module to create FITS subcubes/maps based on the existing SoFiA masks and cleaned cubes for every CLEANED source (if it meets selection criteria and lives in `clean_cat.txt`).  The output includes all moment maps, a position velocity slice along the SoFiA determined kinematic major axis, and an ascii text file of the integrated spectrum in the 3D mask.
 
 Calculates physical properties of detected sources and stores them in `final_cat.txt` which is stored at the taskid level! (Combines results for all beams/cubes!)  If run multiple times on same beam/cube combos, one needs to sort and clean the catalog file by hand.  SoFiA source name is replaced with the position derived source name.
 
-Creates png images including an HI contour overlay on a DSS2 Blue image, intensity weighted velocity map, postion-velocity map through SoFiA kinematic major axis, and an ascii text file of integrated HI spectrum over 2D mask (includes noise).  All pngs, fits, txt files are saved at beam level. BB = beam number; C = cube number; S = SoFiA original source number (combo is unique & can reference back to `clean_cat.txt` and `HI_image_cubeC_4sig_cat.txt`)
+Creates png images including an HI contour overlay on a DSS2 Blue image, on a PanSTARRS false color image, and on an HI gray scale image; intensity weighted velocity map; postion-velocity map through SoFiA kinematic major axis; and an ascii text file of integrated HI spectrum over 2D mask (includes noise).  All pngs, fits, txt files are saved in beam level directory. BB = beam number; C = cube number; S = SoFiA original source number (combo is unique & can reference back to `clean_cat.txt` and `HI_image_cubeC_4sig_cat.txt`)
 
-PNG maps have flags: Red `!` means map impacted by continuum filtering. Orange `!` means spectrum impacted by fully flagged channels
+PNG maps have flags: Red `!` means map impacted by continuum filtering. Orange `!` means spectrum impacted by fully flagged channels.
 
 Output:  
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S.fits` - subcube
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0.fits`
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom1.fits`
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom2.fits`
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_pv.fits`
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0.fits` 
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom1.fits` 
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom2.fits` 
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_pv.fits` 
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_specfull.txt` - Integrated spectrum over 2D mask  
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_spec.txt` - SoFiA generated spectrum
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_spec.txt` - SoFiA generated spectrum 
 
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0.png` - HI contours on DSS2 Blue image  
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0hi.png`
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0hi.png`  
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom0color.png` - PanSTARRS false color image  
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_signif.png` - Pixel-by-pixel SNR    
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_mom1.png`  
-`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_pv.png`  - With 2nd axis which can be truncated.  :(  
+`AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_pv.png`  - With 2nd velocity axis.  
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_specfull.png` - Integrated spectrum over 2D mask  
 `AHC_Jhhmmss.s+ddmmss_TASKID_BB_C_S_spec.png` - SoFiA generated spectrum
 
