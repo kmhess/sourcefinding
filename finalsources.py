@@ -1,9 +1,11 @@
+import copy
 import os
 from glob import glob
 import sys
 
 # importing here prevents error messages from apercal
 from modules.functions import *
+from modules.get_panstarrs import *
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.coordinates import SkyCoord
@@ -13,6 +15,7 @@ from astropy import units as u
 from astropy.wcs import WCS
 from astroquery.skyview import SkyView
 from cosmocalc import cosmocalc
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Ellipse
 from matplotlib import colors
@@ -53,7 +56,11 @@ parser.add_argument('-c', '--cubes', default='1,2,3',
                     help='Specify the cubes on which to do source finding (default: %(default)s).')
 
 parser.add_argument('-n', "--nospline",
-                    help="No spline fitting has been done; so use clean cube not repaired clean cube.",
+                    help="No spline fitting has been done; so use clean cube NOT repaired clean cube.",
+                    action='store_true')
+
+parser.add_argument('-p', "--panstarrs",
+                    help="Retrieve PanSTARRS r-band image rather than DSS2 Blue.",
                     action='store_true')
 
 # Parse the arguments above
@@ -230,6 +237,8 @@ for b in beams:
                     Xsize = np.array([((Xmax - Xc) * hi_cellsize).to(u.arcmin).value, ((Xc - Xmin) * hi_cellsize).to(u.arcmin).value])
                     Ysize = np.array([((Ymax - Yc) * hi_cellsize).to(u.arcmin).value, ((Yc - Ymin) * hi_cellsize).to(u.arcmin).value])
                     opt_view = 6. * u.arcmin
+                    pstar_opt_view = 4. * u.arcmin
+                    pstar_pixsc = 0.25
                     if np.any(Xsize > opt_view.value/2) | np.any(Ysize > opt_view.value/2):
                         opt_view = np.max([Xsize, Ysize])*2 * 1.05 * u.arcmin
                         print("\tOptical image bigger than default. Now {:.2f} arcmin".format(opt_view.value))
@@ -290,36 +299,37 @@ for b in beams:
                         print("\tSpatial filtering flag")
                     flag_kh.append(flag)
 
-                    # # Determine HI position of galaxy & therefore source name
-                    # subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
-                    # hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
-                    # src_name.append('AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
-                    #                                 hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
-
-                    # # Having determined source coordinate based name, rename cubelet products:
-                    # cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '_*')
-                    # cubelet_products += glob(loc + outname + "_" + str(int(obj[0])) + '.fits')
-                    # mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
-                    # for p in cubelet_products:
-                    #     os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
-                    # new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
-
                     # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
                     if (not os.path.isfile(new_outname + '_mom0.png')) | (
                             not os.path.isfile(new_outname + '_mom0hi.png')) | (
                             not os.path.isfile(new_outname + '_signif.png')) | (
                             not os.path.isfile(new_outname + '_posmom1.png')):
 
-                        # Get optical image
-                        path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view, height=opt_view,
-                                                  survey=['DSS2 Blue'], pixels=opt_pixels)
+                        # Get panstarrs optical r-band and false color images:
+                        path = geturl(hi_pos.ra.deg, hi_pos.dec.deg, size=int(pstar_opt_view.to(u.arcsec).value/pstar_pixsc),
+                                      filters="r", format="fits")
+                        if len(path) !=0:
+                            color_im = getcolorim(hi_pos.ra.deg, hi_pos.dec.deg, size=int(pstar_opt_view.to(u.arcsec).value / pstar_pixsc),
+                                                  filters="gri")
+                            hdulist_panstarrs = fits.open(path[0])
+                            wcs_color = WCS(hdulist_panstarrs[0].header)
+                            print("[FINALSOURCES] Optical r-band & false color image retrieved from PanSTARRS")
+                        else:
+                            color_im = None
 
+                        #Get DSS2 Blue optical image:
+                        path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view,
+                                                  height=opt_view, survey=['DSS2 Blue'], pixels=opt_pixels)
                         if len(path) != 0:
+                            hdulist_dss2 = path[0]
                             print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
-                            # Get optical image and HI subimage for object
-                            hdulist_opt = path[0]
-                            d2 = hdulist_opt[0].data
-                            h2 = hdulist_opt[0].header
+
+                            if args.panstarrs:
+                                d2 = hdulist_panstarrs[0].data
+                                h2 = hdulist_panstarrs[0].header
+                            else:
+                                d2 = hdulist_dss2[0].data
+                                h2 = hdulist_dss2[0].header
 
                             hdulist_hi = fits.open(new_outname + '_mom0.fits')
                             # Reproject HI data & calculate contour properties
@@ -341,8 +351,13 @@ for b in beams:
                             if not os.path.isfile(new_outname + '_mom0.png'):
                                 print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
-                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
-                                ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
+                                ax1 = fig.add_subplot(111, projection=WCS(h2))
+                                if args.panstarrs:
+                                    cmap_nan=copy.copy(matplotlib.cm.viridis)
+                                    cmap_nan.set_bad('darkgray')
+                                    ax1.imshow(d2, cmap=cmap_nan, vmin=np.nanpercentile(d2, 10), vmax=np.nanpercentile(d2, 98.8), origin='lower')
+                                else:
+                                    ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
                                 ax1.contour(hi_reprojected, cmap='Oranges', linewidths=1, levels=sensitivity*2**np.arange(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
@@ -352,9 +367,14 @@ for b in beams:
                                 ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
                                 ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='white', fontsize=18)
-                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
-                                                      width=(bminor / opt_view).decompose(), angle=bposangle, transform=ax1.transAxes,
-                                                      edgecolor='white', linewidth=1))
+                                if args.panstarrs:
+                                    ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / pstar_opt_view).decompose(),
+                                                          width=(bminor / pstar_opt_view).decompose(), angle=bposangle,
+                                                          transform=ax1.transAxes, edgecolor='white', linewidth=1))
+                                else:
+                                    ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / opt_view).decompose(),
+                                                          width=(bminor / opt_view).decompose(), angle=bposangle,
+                                                          transform=ax1.transAxes, edgecolor='white', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 fig.savefig(new_outname + '_mom0.png', bbox_inches='tight')
 
@@ -363,7 +383,7 @@ for b in beams:
                                 print("[FINALSOURCES] Making HI grey scale for source {}".format(
                                     new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
-                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                ax1 = fig.add_subplot(111, projection=WCS(h2))
                                 im = ax1.imshow(hi_reprojected, cmap='gray_r', origin='lower')
                                 ax1.contour(hi_reprojected, cmap='Oranges_r', linewidths=1.2, levels=sensitivity*2**np.arange(10))
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='white', linewidth=0.75,
@@ -391,7 +411,7 @@ for b in beams:
                                 norm = colors.BoundaryNorm(boundaries, wa_cmap.N, clip=True)
                                 print("[FINALSOURCES] Making HI significance image for source {}".format(new_outname.split("/")[-1]))
                                 fig = plt.figure(figsize=(8, 8))
-                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                ax1 = fig.add_subplot(111, projection=WCS(h2))
                                 im = ax1.imshow(significance, cmap=wa_cmap, origin='lower', norm=norm)
                                 ax1.contour(hi_reprojected, linewidths=2, levels=[sensitivity, ], colors=['k', ])
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
@@ -411,7 +431,6 @@ for b in beams:
                                 cbar = fig.colorbar(im, cax=cb_ax)
                                 cbar.set_label("Significance", fontsize=18)
                                 fig.savefig(new_outname + '_signif.png', bbox_inches='tight')
-                            hdulist_hi.close()
 
                             # Make velocity map for object
                             if not os.path.isfile(new_outname + '_posmom1.png'):
@@ -423,11 +442,14 @@ for b in beams:
                                         # Set crazy mom1 values to nan:
                                         if (mom1[0].data[i][j] > velmax) | (mom1[0].data[i][j] < velmin):
                                             mom1[0].data[i][j] = np.nan
-                                mom1_reprojected, footprint = reproject_interp(mom1, h2)
+                                if args.panstarrs:
+                                    mom1_reprojected, footprint = reproject_interp(mom1, hdulist_panstarrs[0].header)
+                                else:
+                                    mom1_reprojected, footprint = reproject_interp(mom1, h2)
                                 mom1_reprojected[significance<2.0] = np.nan
                                 v_sys_label = "v_sys = {}   W_50 = {}  W_20 = {}".format(int(v_sys[-1]), int(w50[-1]), int(w20[-1]))
                                 fig = plt.figure(figsize=(8, 8))
-                                ax1 = fig.add_subplot(111, projection=WCS(hdulist_opt[0].header))
+                                ax1 = fig.add_subplot(111, projection=WCS(h2))
                                 im = ax1.imshow(mom1_reprojected, cmap='RdBu_r', vmin=velmin, vmax=velmax, origin='lower')
                                 ax1.contour(hi_reprojected, linewidths=1, levels=[sensitivity, ], colors=['k', ])
                                 if velmax - velmin > 200:
@@ -440,7 +462,13 @@ for b in beams:
                                 # Plot HI center of galaxy
                                 ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='black', linewidth=0.75,
                                             transform=ax1.get_transform('fk5'))
-                                ax1.plot([(hi_pos.ra + 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
+                                if args.panstarrs:
+                                    ax1.plot([(hi_pos.ra + 0.5*pstar_opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
+                                          (hi_pos.ra - 0.5*pstar_opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg],
+                                         [(hi_pos.dec + 0.5*pstar_opt_view * np.cos(kinpa)).deg, (hi_pos.dec - 0.5*pstar_opt_view * np.cos(kinpa)).deg],
+                                         c='black', linestyle='--', linewidth=0.75, transform=ax1.get_transform('fk5'))
+                                else:
+                                    ax1.plot([(hi_pos.ra + 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg,
                                           (hi_pos.ra - 0.5*opt_view * np.sin(kinpa)/np.cos(hi_pos.dec)).deg],
                                          [(hi_pos.dec + 0.5*opt_view * np.cos(kinpa)).deg, (hi_pos.dec - 0.5*opt_view * np.cos(kinpa)).deg],
                                          c='black', linestyle='--', linewidth=0.75, transform=ax1.get_transform('fk5'))
@@ -462,7 +490,33 @@ for b in beams:
                                 fig.savefig(new_outname + '_posmom1.png', bbox_inches='tight')
                                 mom1.close()
 
-                            hdulist_opt.close()
+                            # Overlay HI contours on false color optical image
+                            if not os.path.isfile(new_outname + '_mom0color.png'):
+                                print("[FINALSOURCES] Making optical overlay for source {}".format(new_outname.split("/")[-1]))
+                                if not args.panstarrs:
+                                    hi_reprojected, footprint = reproject_interp(hdulist_hi, hdulist_panstarrs[0].header)
+                                fig = plt.figure(figsize=(8, 8))
+                                ax1 = fig.add_subplot(111, projection=wcs_color)
+                                # ax1.set_facecolor("darkgray")   # Doesn't work with the color im
+                                ax1.imshow(color_im, origin='lower')
+                                ax1.contour(hi_reprojected, cmap='Oranges', linewidths=1, levels=sensitivity*2**np.arange(10))
+                                ax1.scatter(hi_pos.ra.deg, hi_pos.dec.deg, marker='x', c='white', linewidth=0.75,
+                                            transform=ax1.get_transform('fk5'))
+                                ax1.set_title(src_name[-1], fontsize=20)
+                                ax1.tick_params(axis='both', which='major', labelsize=18)
+                                ax1.coords['ra'].set_axislabel('RA (J2000)', fontsize=20)
+                                ax1.coords['dec'].set_axislabel('Dec (J2000)', fontsize=20)
+                                ax1.text(0.5, 0.05, nhi_label, ha='center', va='center', transform=ax1.transAxes,
+                                         color='white', fontsize=18)
+                                ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / pstar_opt_view).decompose(),
+                                                      width=(bminor / pstar_opt_view).decompose(), angle=bposangle, transform=ax1.transAxes,
+                                                      edgecolor='gray', linewidth=1))
+                                if flag != 0: plot_flags(flag, ax1)
+                                fig.savefig(new_outname + '_mom0color.png', bbox_inches='tight')
+
+                            hdulist_hi.close()
+                            hdulist_panstarrs.close()
+                            hdulist_dss2.close()
 
                         else:
                             print("\tWARNING: No optical image found, so no moment-related png's produced")
