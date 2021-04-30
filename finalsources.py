@@ -80,26 +80,29 @@ H0 = 70.
 
 cube_name = 'HI_image_cube'
 
-header = ['name', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'err_x', 'err_y', 'err_z',
-          'logMhi', 'SJyHz', 'SJyHz_err', 'f_sum', 'err_f_sum', 'n_pix', 'redshift', 'reds_err', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
+# order for things to appear in the table matters!  Best to stick to it...
+# header is order things will appear in the "final_cat.txt"
+# cat* must be in order of things in SoFiA table + order of things added to table at end of code.
+header = ['name', 'x', 'y', 'z', 'x_min', 'x_max', 'y_min', 'y_max', 'z_min', 'z_max', 'err_x', 'err_y', 'err_z', 'logMhi',
+          'SJyHz', 'SJyHz_err', 'f_sum', 'err_f_sum', 'n_pix', 'freq_obs', 'redshift', 'reds_err', 'v_sys', 'D_Lum', 'rms_spec', 'SNR',
           'flag', 'flag_kh', 'rms', 'w20', 'w50', 'kin_pa', 'bmaj', 'bmin', 'bpa', 'pix_beam', 'taskid', 'beam', 'cube', 'id']
 
 catParNames = ("name", "id", "x", "y", "z", "x_min", "x_max", "y_min", "y_max", "z_min", "z_max", "n_pix",
                "f_min", "f_max", "f_sum", "rel", "flag", "rms", "w20", "w50", "ell_maj", "ell_min", "ell_pa",
                "ell3s_maj", "ell3s_min", "ell3s_pa", "kin_pa", "err_x", "err_y", "err_z", "err_f_sum", "taskid", "beam", "cube",
-               "SJyHz", "SJyHz_err", "logMhi", "redshift", "reds_err", "v_sys", "D_Lum", "rms_spec", "SNR", "flag_kh",
+               "SJyHz", "SJyHz_err", "logMhi", "freq_obs", "redshift", "reds_err", "v_sys", "D_Lum", "rms_spec", "SNR", "flag_kh",
                "bmaj", "bmin", "bpa", "pix_beam")
 
 catParUnits = ("-", "-", "pix", "pix", "chan", "pix", "pix", "pix", "pix", "chan", "chan", "-",
                "Jy/beam", "Jy/beam", "Jy/beam", "-", "-", "Jy/beam", "km/s", "km/s", "pix", "pix", "pix",
                "pix", "pix", "deg", "deg", "pix", "pix", "pix", "Jy/beam", "-", "-", "-",
-               "Jy*Hz", "Jy*Hz", "log(M_Sun)", "-", "-", "km/s", "Mpc", "Jy/chan", "-", "-",
+               "Jy*Hz", "Jy*Hz", "log(M_Sun)", "MHz", "-", "-", "km/s", "Mpc", "Jy/chan", "-", "-",
                "arcsec", "arcsec", "deg", "pix/beam")
 
 catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i", "%7i", "%7i", "%7i", "%8i",
                "%10.7f", "%10.7f", "%12.6f", "%8.6f", "%7i", "%12.6f", "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%10.3f",
                "%10.3f", "%10.3f", "%10.3f", "%10.3f", "%8.3f", "%8.3f", "%8.3f", "%12.6f", "%10i", "%7i", "%7i",
-               "%13.6f", "%13.6f", "%12.6f", "%11.7f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f", "%7i",
+               "%13.6f", "%13.6f", "%12.6f", "%11.5f", "%11.7f", "%11.7f", "%11.3f", "%10.3f", "%11.7f", "%8.3f", "%7i",
                "%9.3f", "%9.3f", "%9.3f", "%10.3f")
 
 for b in beams:
@@ -128,10 +131,17 @@ for b in beams:
                     hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
                 pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)
+                hdu_clean.close()
+
+                # First step is to just plot things in Barycentric velocity.  THEN think about whether the underlying cubes should be changed.
+                # if hdu_pb[0].header['SPECSYS'] = 'TOPOCENT':
+                #     hdu_pb = topo2bary(hdu_name=loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
+                # else:
+                #     hdu_pb = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
                 hdu_pb = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
 
                 outname = 'X_{}_{:02}_{}'.format(taskid, b, c)
-                wcs = WCS(hdu_clean[0].header)
+                wcs = WCS(hdu_pb[0].header)
 
                 # Make cubelets around each individual source, mom0,1,2 maps, and sub-spectra from cleaned data
                 # Note that the name column causes big issues because it forces np.array to cast to string, not float!
@@ -143,31 +153,32 @@ for b in beams:
                     objects.append(obj[1:])
                 objects = np.array(objects)
                 print("[FINALSOURCES] Making cubelets for sources in {}_cat.txt Beam {:02} Cube {}".format(clean_name, b, c))
-                cubelets.writeSubcube(hdu_pb[0].data, hdu_clean[0].header, hdu_mask3d[0].data, objects, cathead,
+                cubelets.writeSubcube(hdu_pb[0].data, hdu_pb[0].header, hdu_mask3d[0].data, objects, cathead,
                                       outname, loc, False, False)
 
                 # Get beam size and cell size
                 bmaj, bmin, bpa, pix_beam = [], [], [], []
-                bmajor = hdu_clean[0].header['BMAJ'] * 3600. * u.arcsec
+                bmajor = hdu_pb[0].header['BMAJ'] * 3600. * u.arcsec
                 bmaj.append(bmajor.value)
-                bminor = hdu_clean[0].header['BMIN'] * 3600. * u.arcsec
+                bminor = hdu_pb[0].header['BMIN'] * 3600. * u.arcsec
                 bmin.append(bminor.value)
-                bposangle = hdu_clean[0].header['BPA']
+                bposangle = hdu_pb[0].header['BPA']
                 bpa.append(bposangle)
-                hi_cellsize = hdu_clean[0].header['CDELT2'] * 3600. * u.arcsec
+                hi_cellsize = hdu_pb[0].header['CDELT2'] * 3600. * u.arcsec
                 pix_per_beam = bmajor / hi_cellsize * bminor / hi_cellsize * np.pi / (4 * np.log(2))
                 pix_beam.append(pix_per_beam)
-                chan_width = hdu_clean[0].header['CDELT3'] * u.Hz
+                chan_width = hdu_pb[0].header['CDELT3'] * u.Hz
                 opt_pixels = 900
 
                 # Make HI profiles with noise over whole cube by squashing 3D mask:
-                cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
+                cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
 
-                SJyHz, SJyHz_err, logMhi, redshift, redshift_err, v_sys = [], [], [], [], [], []
+                # For each object, calculate galaxy properties, make images and spectra:
+                SJyHz, SJyHz_err, logMhi, redshift, redshift_err, freq_sys, v_sys = [], [], [], [], [], [], []
                 D_Lum, rms_spec, SNR, w50, w20, src_name, flag_kh, f_sum = [], [], [], [], [], [], [], []
                 for obj in objects:
                     # Some lines stolen from cubelets in  SoFiA:
-                    cubeDim = hdu_clean[0].data.shape
+                    cubeDim = hdu_pb[0].data.shape
                     Xc = obj[cathead == "x"][0]
                     Yc = obj[cathead == "y"][0]
                     Zc = obj[cathead == "z"][0]
@@ -196,6 +207,26 @@ for b in beams:
                     ZmaxNew = cPixZNew + maxZ
                     if ZmaxNew > cubeDim[0] - 1: ZmaxNew = cubeDim[0] - 1
 
+                    # Determine HI position of galaxy & therefore source name
+                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
+                    hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
+                    src_name.append(
+                        'AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                                             hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
+                    # Use position to calculate barycentric correction to systemic velocity
+                    # barycorr_kms = barycorr(taskid=taskid, radec_skycoord=hi_pos)
+                    freq_hi = chan2freq(channels=obj[cathead == "z"][0], hdu=hdu_pb)
+                    freq_sys.append(freq_hi.value/1.e6)   # Convert from units of Hz to MHz
+
+                    # Having determined source coordinate based name, rename cubelet products:
+                    cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '_*')
+                    cubelet_products += glob(loc + outname + "_" + str(int(obj[0])) + '.fits')
+                    mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
+                    for p in cubelet_products:
+                        os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
+                    new_outname = mv_to_name + outname[1:] + "_" + str(int(obj[0]))
+
+                    # Calculate the size of the optical image for the moment maps
                     Xsize = np.array([((Xmax - Xc) * hi_cellsize).to(u.arcmin).value, ((Xc - Xmin) * hi_cellsize).to(u.arcmin).value])
                     Ysize = np.array([((Ymax - Yc) * hi_cellsize).to(u.arcmin).value, ((Yc - Ymin) * hi_cellsize).to(u.arcmin).value])
                     opt_view = 6. * u.arcmin
@@ -213,7 +244,7 @@ for b in beams:
 
                     # Array math a lot faster on (spatially) tiny subcubes from cubelets.writeSubcubes:
                     subcube = hdu_pb[0].data[:, int(YminNew):int(YmaxNew) + 1, int(XminNew):int(XmaxNew) + 1]
-                    submask = fits.getdata(loc + outname + '_{}_mask.fits'.format(int(obj[0])))
+                    submask = fits.getdata(new_outname + '_mask.fits')
                     # Can potentially save mask2d as a better nchan if need be because mask values are 0 or 1:
                     mask2d = np.sum(submask, axis=0)
                     # Create subimage of the continuum filtering to raise flag if it affects source
@@ -226,14 +257,13 @@ for b in beams:
                     spectrum = np.nansum(subcube[:, mask2d != 0], axis=1)
                     signal = np.nansum(spectrum[int(Zmin):int(Zmax)])
                     SJyHz.append(signal * chan_width.value / pix_per_beam)
-                    freq_sys = chan2freq(channels=int(obj[cathead == "z"][0]), hdu=hdu_clean)  # Remove int at some point!!!
                     # w50 & w20 in rest frame of the observer
-                    w50.append((const.c * obj[cathead == "w50"][0] * chan_width / freq_sys).to(u.km/u.s).value)
-                    w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_sys).to(u.km/u.s).value)
-                    v_sys.append(freq_sys.to(u.km/u.s, equivalencies=optical_HI).value)
-                    redshift.append(HI_restfreq / freq_sys - 1.)
+                    w50.append((const.c * obj[cathead == "w50"][0] * chan_width / freq_hi).to(u.km / u.s).value)
+                    w20.append((const.c * obj[cathead == "w20"][0] * chan_width / freq_hi).to(u.km / u.s).value)
+                    v_sys.append(freq_hi.to(u.km / u.s, equivalencies=optical_HI).value)
+                    redshift.append(HI_restfreq / freq_hi - 1.)
                     try:
-                        redshift_err.append((HI_restfreq / freq_sys**2 ) * obj[cathead == "err_z"][0] * chan_width)
+                        redshift_err.append((HI_restfreq / freq_hi ** 2) * obj[cathead == "err_z"][0] * chan_width)
                     except:
                         redshift_err.append(0.0)
                     cosmo = cosmocalc(redshift[-1], H0)
@@ -260,19 +290,19 @@ for b in beams:
                         print("\tSpatial filtering flag")
                     flag_kh.append(flag)
 
-                    # Determine HI position of galaxy & therefore source name
-                    subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
-                    hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
-                    src_name.append('AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
-                                                    hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
+                    # # Determine HI position of galaxy & therefore source name
+                    # subcoords = wcs.wcs_pix2world(Xc, Yc, 1, 0)
+                    # hi_pos = SkyCoord(ra=subcoords[0], dec=subcoords[1], unit=u.deg)
+                    # src_name.append('AHC J{0}{1}'.format(hi_pos.ra.to_string(unit=u.hourangle, sep='', precision=1, pad=True),
+                    #                                 hi_pos.dec.to_string(sep='', precision=0, alwayssign=True, pad=True)))
 
-                    # Having determined source coordinate based name, rename cubelet products:
-                    cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '_*')
-                    cubelet_products += glob(loc + outname + "_" + str(int(obj[0])) + '.fits')
-                    mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
-                    for p in cubelet_products:
-                        os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
-                    new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
+                    # # Having determined source coordinate based name, rename cubelet products:
+                    # cubelet_products = glob(loc + outname + "_" + str(int(obj[0])) + '_*')
+                    # cubelet_products += glob(loc + outname + "_" + str(int(obj[0])) + '.fits')
+                    # mv_to_name = loc + "AHC" + src_name[-1].split(" ")[1]
+                    # for p in cubelet_products:
+                    #     os.system("mv " + p + " " + mv_to_name + p.split("X")[-1])
+                    # new_outname = loc + "AHC" + src_name[-1].split(" ")[1] + outname[1:] + "_" + str(int(obj[0]))
 
                     # Make a total intensity map overlayed on optical, HI grey scale, and HI significance maps
                     if (not os.path.isfile(new_outname + '_mom0.png')) | (
@@ -427,6 +457,7 @@ for b in beams:
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
+                                # cbar.set_label("Barycentric Optical Velocity [km/s]", fontsize=18)
                                 cbar.set_label("Velocity [km/s]", fontsize=18)
                                 fig.savefig(new_outname + '_posmom1.png', bbox_inches='tight')
                                 mom1.close()
@@ -452,7 +483,7 @@ for b in beams:
                         ax1.autoscale(False)
                         ax1.plot([0.0, 0.0], [freq1, freq2], c='orange', linestyle='--', linewidth=0.75,
                                  transform=ax1.get_transform('world'))
-                        ax1.plot([ang1, ang2], [freq_sys.value, freq_sys.value], c='orange', linestyle='--',
+                        ax1.plot([ang1, ang2], [freq_hi.value, freq_hi.value], c='orange', linestyle='--',
                                  linewidth=0.75, transform=ax1.get_transform('world'))
                         ax1.set_title(src_name[-1], fontsize=16)
                         ax1.tick_params(axis='both', which='major', labelsize=18)
@@ -464,7 +495,7 @@ for b in beams:
                         vel1 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq1 - 1)
                         vel2 = const.c.to(u.km/u.s).value * (HI_restfreq.value / freq2 - 1)
                         ax2.set_ylim(vel2, vel1)
-                        ax2.set_ylabel('Velocity [km/s]')
+                        ax2.set_ylabel('Topocentric Optical Velocity [km/s]')
                         ax1.text(0.5, 0.05, 'Kinematic PA = {:5.1f} deg'.format(kinpa.value), ha='center', va='center',
                                  transform=ax1.transAxes, color='orange', fontsize=18)
                         fig.savefig(new_outname + '_pv.png', bbox_inches='tight')
@@ -486,10 +517,10 @@ for b in beams:
                     if not os.path.isfile(new_outname + '_specfull.png'):
                         print("[FINALSOURCES] Making HI spectrum plot for source {}".format(new_outname.split("/")[-1]))
                         spectrumJy = spectrum / pix_per_beam
-                        cube_frequencies = chan2freq(np.array(range(hdu_clean[0].data.shape[0])), hdu=hdu_clean)
+                        cube_frequencies = chan2freq(np.array(range(hdu_pb[0].data.shape[0])), hdu=hdu_pb)
                         optical_velocity = cube_frequencies.to(u.km / u.s, equivalencies=optical_HI)
-                        maskmin = chan2freq(Zmin, hdu=hdu_clean).to(u.km / u.s, equivalencies=optical_HI).value
-                        maskmax = chan2freq(Zmax, hdu=hdu_clean).to(u.km / u.s, equivalencies=optical_HI).value
+                        maskmin = chan2freq(Zmin, hdu=hdu_pb).to(u.km / u.s, equivalencies=optical_HI).value
+                        maskmax = chan2freq(Zmax, hdu=hdu_pb).to(u.km / u.s, equivalencies=optical_HI).value
                         fig = plt.figure(figsize=(15, 4))
                         ax_spec = fig.add_subplot(111)
                         ax_spec.plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
@@ -502,6 +533,7 @@ for b in beams:
                             ax_spec.set_ylim(np.max(spectrumJy[int(Zmin):int(Zmax)]) * -2,
                                              np.max(spectrumJy[int(Zmin):int(Zmax)]) * 2)
                         ax_spec.set_ylabel("Integrated Flux [Jy]")
+                        # ax_spec.set_xlabel("Barycentric Optical Velocity [km/s]")
                         ax_spec.set_xlabel("Optical Velocity [km/s]")
                         fig.savefig(new_outname + '_specfull.png', bbox_inches='tight')
 
@@ -518,6 +550,7 @@ for b in beams:
                         ax_spec.set_title(src_name[-1])
                         ax_spec.set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
                         ax_spec.set_ylabel("Integrated Flux [Jy]")
+                        # ax_spec.set_xlabel("Barycentric Optical Velocity [km/s]")
                         ax_spec.set_xlabel("Optical Velocity [km/s]")
                         fig.savefig(new_outname + '_spec.png', bbox_inches='tight')
 
@@ -527,6 +560,7 @@ for b in beams:
                 cat['SJyHz'] = SJyHz
                 cat['SJyHz_err'] = SJyHz_err
                 cat['logMhi'] = logMhi
+                cat['freq_obs'] = freq_sys
                 cat['redshift'] = redshift
                 cat['reds_err'] = redshift_err
                 cat['v_sys'] = v_sys
@@ -560,7 +594,6 @@ for b in beams:
                 write_catalog(objects, catParNames, catParUnits, catParFormt, header, outName=loc[:-5] + 'final_cat.txt')
 
                 # Close all related cube files
-                hdu_clean.close()
                 hdu_mask3d.close()
                 hdu_filter.close()
                 hdu_pb.close()
