@@ -4,7 +4,7 @@ from astropy.time import Time
 import astropy.units as u
 import numpy as np
 
-from PB_correction_happili2 import *
+from .PB_correction_happili2 import *
 
 
 # ----------------------------------------------
