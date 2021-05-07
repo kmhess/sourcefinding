@@ -125,6 +125,7 @@ for b in beams:
                 cathead = np.array(cat.colnames)[1:]    # This is to avoid issues with the name column in writeSubcube.
                 print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
 
+                # *** THIS NEEDS TO BE REWRITTEN!!! ***
                 # Read in the cleaned data and original SoFiA mask:
                 if os.path.isfile(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name)):
                     hdu_clean = fits.open(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name))
@@ -137,8 +138,11 @@ for b in beams:
                 else:
                     hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
 
-                pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)
+                if not os.path.isfile(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name)):
+                    pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)
+
                 hdu_clean.close()
+                # *** ABOVE NEEDS TO BE REWRITTEN!!! ***
 
                 # First step is to just plot things in Barycentric velocity.  THEN think about whether the underlying cubes should be changed.
                 # if hdu_pb[0].header['SPECSYS'] = 'TOPOCENT':
@@ -308,7 +312,7 @@ for b in beams:
                         # Get panstarrs optical r-band and false color images:
                         path = geturl(hi_pos.ra.deg, hi_pos.dec.deg, size=int(pstar_opt_view.to(u.arcsec).value/pstar_pixsc),
                                       filters="r", format="fits")
-                        if len(path) !=0:
+                        if (len(path) !=0) & (args.panstarrs | (not os.path.isfile(new_outname + '_mom0color.png'))):
                             color_im = getcolorim(hi_pos.ra.deg, hi_pos.dec.deg, size=int(pstar_opt_view.to(u.arcsec).value / pstar_pixsc),
                                                   filters="gri")
                             hdulist_panstarrs = fits.open(path[0])
@@ -318,10 +322,11 @@ for b in beams:
                             color_im = None
 
                         #Get DSS2 Blue optical image:
-                        path = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view,
+                        path2 = SkyView.get_images(position=hi_pos.to_string('hmsdms'), width=opt_view,
                                                   height=opt_view, survey=['DSS2 Blue'], pixels=opt_pixels)
-                        if len(path) != 0:
-                            hdulist_dss2 = path[0]
+                        print(hi_pos.to_string('hmsdms'))
+                        if len(path2) != 0:
+                            hdulist_dss2 = path2[0]
                             print("[FINALSOURCES] Optical image retrieved from DSS2 Blue")
 
                             if args.panstarrs:
@@ -359,7 +364,7 @@ for b in beams:
                                 if args.panstarrs:
                                     cmap_nan=copy.copy(matplotlib.cm.viridis)
                                     cmap_nan.set_bad('darkgray')
-                                    ax1.imshow(d2, cmap=cmap_nan, vmin=np.nanpercentile(d2, 10), vmax=np.nanpercentile(d2, 98.8), origin='lower')
+                                    ax1.imshow(d2, cmap=cmap_nan, vmin=np.nanpercentile(d2, 10), vmax=np.nanpercentile(d2, 99.8), origin='lower')
                                 else:
                                     ax1.imshow(d2, cmap='viridis', vmin=np.percentile(d2, 10), vmax=np.percentile(d2, 99.8), origin='lower')
                                 ax1.contour(hi_reprojected, cmap='Oranges', linewidths=1, levels=sensitivity*2**np.arange(10))
@@ -474,12 +479,12 @@ for b in beams:
                                 ax1.text(0.5, 0.05, v_sys_label, ha='center', va='center', transform=ax1.transAxes,
                                          color='black', fontsize=18)
                                 ax1.add_patch(Ellipse((0.92, 0.9), height=patch_height, width=patch_width, angle=bposangle,
-                                                      transform=ax1.transAxes, edgecolor='darkgray', linewidth=1))
+                                                      transform=ax1.transAxes, edgecolor='darkred', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 cb_ax = fig.add_axes([0.91, 0.11, 0.02, 0.76])
                                 cbar = fig.colorbar(im, cax=cb_ax)
                                 # cbar.set_label("Barycentric Optical Velocity [km/s]", fontsize=18)
-                                cbar.set_label("Velocity [km/s]", fontsize=18)
+                                cbar.set_label("Optical velocity [km/s]", fontsize=18)
                                 fig.savefig(new_outname + '_posmom1.png', bbox_inches='tight')
                                 mom1.close()
 
@@ -503,7 +508,7 @@ for b in beams:
                                          color='white', fontsize=18)
                                 ax1.add_patch(Ellipse((0.92, 0.9), height=(bmajor / pstar_opt_view).decompose(),
                                                       width=(bminor / pstar_opt_view).decompose(), angle=bposangle, transform=ax1.transAxes,
-                                                      edgecolor='gray', linewidth=1))
+                                                      edgecolor='lightgray', linewidth=1))
                                 if flag != 0: plot_flags(flag, ax1)
                                 fig.savefig(new_outname + '_mom0color.png', bbox_inches='tight')
 
@@ -534,7 +539,7 @@ for b in beams:
                                  linewidth=0.75, transform=ax1.get_transform('world'))
                         ax1.set_title(src_name[-1], fontsize=16)
                         ax1.tick_params(axis='both', which='major', labelsize=18)
-                        ax1.set_xlabel('Angular Offset', fontsize=16)
+                        ax1.set_xlabel('Angular Offset [deg]', fontsize=16)
                         ax1.set_ylabel('Frequency [Hz]', fontsize=16)
                         ax1.coords[1].set_ticks_position('l')
                         freq_yticks = ax1.get_yticks()  # freq auto yticks from matplotlib
