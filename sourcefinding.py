@@ -129,7 +129,7 @@ for b in beams:
 # Can this be parallelized? Especially the two for loops.
 
         # Check to see if the continuum filtered file exists.  If not, make it  with SoFiA-2
-        if (not overwrite) & os.path.isfile(filteredfits):
+        if (not overwrite) & (os.path.isfile(filteredfits) | os.path.isfile(splinefits)):
             print("[SOURCEFINDING] Continuum filtered file exists and will not be overwritten.")
         elif os.path.isfile(sourcefits):
             print("[SOURCEFINDING] Making continuum filtered file.")

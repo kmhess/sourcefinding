@@ -68,70 +68,88 @@ def main(taskid, beams, nospline=False):
 
             previous = 0
             for c in cubes:
-                if os.path.isfile(loc + cube_name + '{}_filtered.fits'.format(c)):
+                # Make robust for saved data:
+                if os.path.isfile(loc + cube_name + '{}_filtered-2d.fits'.format(c)):
+                    hdu_filter = fits.open(loc + cube_name + '{}_filtered-2d.fits'.format(c))
+                    filter2d = hdu_filter[0].data[:, :]
+                    filter2d[filter2d == 1] = 9.
+                    hdu_filter.close()
+                elif os.path.isfile(loc + cube_name + '{}_filtered.fits'.format(c)):
                     hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
                     # SVC data has the 0th channel blanked; so use the first channel instead.
                     filter2d = hdu_filter[0].data[1, :, :]
                     filter2d[np.isnan(filter2d)] = 9.
                     filter2d[filter2d < 9] = np.nan
                     hdu_filter.close()
-
-                    if os.path.isfile(loc + cube_name + '{}_4sig_cat.txt'.format(c)):
-                        cat = ascii.read(loc + cube_name + '{}_4sig_cat.txt'.format(c))
-                        print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
-                        if len(cat) > max_cat_len:
-                            print("\tMore than {} candidates: seems this cube is crap".format(max_cat_len))
-                            cat = cat[:max_cat_len]
-                        hdu_mask = fits.open(loc + cube_name + '{}_4sig_mask-2d.fits'.format(c))
-                        mask2d = hdu_mask[0].data[:, :]
-
-                        mask2d = np.asfarray(mask2d)
-                        mask2d[mask2d < 1] = np.nan
-
-                        hdu_spline = fits.open(loc +cube_name + '{}_filtered_spline.fits'.format(c))
-                        cube_frequencies = chan2freq(np.array(range(hdu_spline[0].data.shape[0])), hdu=hdu_spline)
-                        optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
-
-                        ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
-                        ax_im[c-1].imshow(mask2d, cmap='gist_rainbow', origin='lower')
-                        ax_im[c-1].set_title("Beam {:02} Cube {}".format(b, c))
-                        ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
-                        ra.set_format_unit(u.hour)
-                        for s in range(len(cat)):
-                            ax_im[c-1].text(cat['col3'][s] + np.random.uniform(-40, 40), cat['col4'][s] + np.random.uniform(-40, 40),
-                                            cat['col2'][s], color='black')
-                            spectrum = np.nansum(hdu_spline[0].data[:, mask2d == cat['col2'][s]], axis=1)
-                            maskmin = chan2freq(cat['col10'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
-                            maskmax = chan2freq(cat['col11'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
-                            ax_spec[previous + s, 0].plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
-                            ax_spec[previous + s, 0].plot(optical_velocity, spectrum, c=colors[c-1])
-                            ax_spec[previous + s, 0].plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec[previous + s, 0].plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
-                            ax_spec[previous + s, 0].set_title("Beam {:02}, Cube {}, Source {}".format(b, c, cat['col2'][s]))
-                            ax_spec[previous + s, 0].set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
-                            if (np.nanmax(spectrum) > 2.) | (np.nanmin(spectrum) < -2.):
-                                ax_spec[previous + s, 0].set_ylim(np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * -2,
-                                                                  np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
-                            ax_spec[previous + s, 0].set_ylabel("Integrated Flux")
-                            if previous + s == source_per_beam - 1:
-                                ax_spec[previous + s, 0].set_xlabel("Optical Velocity [km/s]")
-                            if s+1 >= max_cat_len:
-                                ax_spec[previous + s, 0].text(0.5, 0.05, "Too many spectra to plot, check by hand.",
-                                                              ha='center', transform=ax_spec[previous + s, 0].transAxes)
-                        previous += len(cat)
-
-                        hdu_mask.close()
-
-                    else:
-                        print("\tNO sources in Beam {:02} Cube {}".format(b, c))
-                        ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
-                        ax_im[c - 1].set_title("Beam {:02} Cube {}".format(b, c))
-                        ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
-                        ra.set_format_unit(u.hour)
-                        ax_im[c - 1].axis('off')
-
+                elif os.path.isfile(loc + cube_name + '{}_filtered_spline.fits'.format(c)):
+                    hdu_filter = fits.open(loc + cube_name + '{}_filtered_spline.fits'.format(c))
+                    # SVC data has the 0th channel blanked; so use the first channel instead.
+                    filter2d = hdu_filter[0].data[1, :, :]
+                    filter2d[np.isnan(filter2d)] = 9.
+                    filter2d[filter2d < 9] = np.nan
+                    hdu_filter.close()
                 else:
                     print("\tNo continuum filtered file for Beam {:02} Cube {}. Check sourcefinding/ALTA?".format(b, c))
+                    # As a precaution, if there is no filtered cube, don't plot source masks either.
+                    continue
+
+                if os.path.isfile(loc + cube_name + '{}_4sig_cat.txt'.format(c)):
+                    cat = ascii.read(loc + cube_name + '{}_4sig_cat.txt'.format(c))
+                    print("\tFound {} sources in Beam {:02} Cube {}".format(len(cat), b, c))
+                    if len(cat) > max_cat_len:
+                        print("\tMore than {} candidates: seems this cube is crap".format(max_cat_len))
+                        cat = cat[:max_cat_len]
+                    hdu_mask = fits.open(loc + cube_name + '{}_4sig_mask-2d.fits'.format(c))
+                    mask2d = hdu_mask[0].data[:, :]
+
+                    mask2d = np.asfarray(mask2d)
+                    mask2d[mask2d < 1] = np.nan
+
+                    if os.path.isfile(loc + cube_name + '{}_all_spline.fits'.format(c)):
+                        hdu_spline = fits.open(loc + cube_name + '{}_all_spline.fits'.format(c))
+                    elif os.path.isfile(loc + cube_name + '{}_filtered_spline.fits'.format(c)):
+                        hdu_spline = fits.open(loc + cube_name + '{}_filtered_spline.fits'.format(c))
+                    cube_frequencies = chan2freq(np.array(range(hdu_spline[0].data.shape[0])), hdu=hdu_spline)
+                    optical_velocity = cube_frequencies.to(u.km/u.s, equivalencies=optical_HI)
+
+                    ax_im[c-1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
+                    ax_im[c-1].imshow(mask2d, cmap='gist_rainbow', origin='lower')
+                    ax_im[c-1].set_title("Beam {:02} Cube {}".format(b, c))
+                    ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
+                    ra.set_format_unit(u.hour)
+                    for s in range(len(cat)):
+                        ax_im[c-1].text(cat['col3'][s] + np.random.uniform(-40, 40), cat['col4'][s] + np.random.uniform(-40, 40),
+                                        cat['col2'][s], color='black')
+                        spectrum = np.nansum(hdu_spline[0].data[:, mask2d == cat['col2'][s]], axis=1)
+                        maskmin = chan2freq(cat['col10'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
+                        maskmax = chan2freq(cat['col11'][s], hdu=hdu_spline).to(u.km/u.s, equivalencies=optical_HI).value
+                        ax_spec[previous + s, 0].plot([optical_velocity[-1].value, optical_velocity[0].value], [0, 0], '--', color='gray')
+                        ax_spec[previous + s, 0].plot(optical_velocity, spectrum, c=colors[c-1])
+                        ax_spec[previous + s, 0].plot([maskmin, maskmin], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                        ax_spec[previous + s, 0].plot([maskmax, maskmax], [np.nanmin(spectrum), np.nanmax(spectrum)], ':', color='gray')
+                        ax_spec[previous + s, 0].set_title("Beam {:02}, Cube {}, Source {}".format(b, c, cat['col2'][s]))
+                        ax_spec[previous + s, 0].set_xlim(optical_velocity[-1].value, optical_velocity[0].value)
+                        if (np.nanmax(spectrum) > 2.) | (np.nanmin(spectrum) < -2.):
+                            ax_spec[previous + s, 0].set_ylim(np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * -2,
+                                                              np.nanmax(spectrum[cat['col10'][s]:cat['col11'][s]]) * 2)
+                        ax_spec[previous + s, 0].set_ylabel("Integrated Flux")
+                        if previous + s == source_per_beam - 1:
+                            ax_spec[previous + s, 0].set_xlabel("Optical Velocity [km/s]")
+                        if s+1 >= max_cat_len:
+                            ax_spec[previous + s, 0].text(0.5, 0.05, "Too many spectra to plot, check by hand.",
+                                                          ha='center', transform=ax_spec[previous + s, 0].transAxes)
+                    previous += len(cat)
+
+                    hdu_mask.close()
+                    hdu_spline.close()
+
+                else:
+                    print("\tNO sources in Beam {:02} Cube {}".format(b, c))
+                    ax_im[c - 1].imshow(filter2d, cmap='Greys_r', vmax=10, vmin=8, origin='lower')
+                    ax_im[c - 1].set_title("Beam {:02} Cube {}".format(b, c))
+                    ra = ax_im[c - 1].coords[0]  # Don't understand why this doesn't work: python 2.7 vs 3?
+                    ra.set_format_unit(u.hour)
+                    ax_im[c - 1].axis('off')
 
             if nospline:
                 fig_im.savefig(loc + 'HI_image_4sig_summary.png', bbox_inches='tight')
