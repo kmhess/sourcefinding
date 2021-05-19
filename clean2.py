@@ -199,7 +199,7 @@ catParFormt = ("%12s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
 prepare = apercal.prepare()
 
 for b in beams:
-    loc = '/tank/hess/manga/' + taskid + '_b/B0' + str(b).zfill(2) + '/'
+    loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     print("\t{}".format(loc))
     clean_catalog = loc + 'clean_cat.txt'
 
