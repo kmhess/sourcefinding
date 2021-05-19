@@ -136,7 +136,7 @@ for b in beams:
                 if os.path.isfile(loc + cube_name + '{}_filtered-2d.fits'.format(c)):
                     hdu_filter = fits.open(loc + cube_name + '{}_filtered-2d.fits'.format(c))
                 else:
-                    hdu_filter = fits.open(loc + cube_name + '{}_filtered.fits'.format(c))
+                    hdu_filter = fits.open(loc + cube_name + '{}_filtered_spline.fits'.format(c))
 
                 if not os.path.isfile(loc + cube_name + '{}_{}_cbcor.fits'.format(c, clean_name)):
                     pbcor(taskid, loc + cube_name + '{}_{}.fits'.format(c, clean_name), hdu_clean, b, c)

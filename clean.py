@@ -235,7 +235,10 @@ for b in beams:
                 f = pyfits.open(filteredfits)
                 print("[CLEAN] Determining the statistics from the filtered Beam {:02}, Cube {}.".format(b, c))
             else:
-                f = pyfits.open(splinefits)
+                if os.path.isfile(splinefits):
+                    f = pyfits.open(splinefits)
+                else:
+                    f = pyfits.open(new_splinefits)
                 print("[CLEAN] Determining the statistics from the filtered & spline fitted Beam {:02}, Cube {}.".format(b, c))
             mask = np.ones(f[0].data.shape[0], dtype=bool)
             if c == 3: mask[376:662] = False
