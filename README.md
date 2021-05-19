@@ -31,10 +31,10 @@ Output:
 \**PLOTS SHOULD BE VISUALLY INSPECTED TO DETERMINE THE RIGHT WAY TO RUN `clean.py`.\**
 
 
-### Step 2: clean.py
+### Step 2: clean2.py
 Repairs spline fitted cube if necessary.  Cleans the HI emission per beam/cube based on input mask files and user source selection.  
 ```
-python clean.py -t <taskid> -b <beams> -c <cubes> -s <sources> -o <optionally overwrites prev clean/model/residual FITS, repaired spline fit files.> -j <number of parallel jobs> -n <no spline fittting>
+python clean.py -t <taskid> -b <beams> -c <cubes> -s <sources> -o <optionally overwrites prev clean/model/residual FITS, repaired spline fit files.> -j <number of parallel jobs> -n <no spline fittting> -a <make model and residual cubes as well>
 ```
 Default for beams is 0-39 (all).  
 Default for cubes is 1,2,3 (these are the 3 nearest cubes in which we expect direct detections--in 150 MHz processing nomenclature).  
@@ -47,8 +47,9 @@ Generates a catalog of what SoFiA sources have been cleaned, for each \*beam*.  
 Output:  
 `HI_image_cube*_all_spline.fits` - (default) repaired filtered_spline cube which is then cleaned.  
 `HI_image_cube*{_rep}_clean.fits` - cleaned cube, used in `finalsources.py`.  
-`HI_image_cube*{_rep}_model.fits` - model cube  
-`HI_image_cube*{_rep}_residual.fits` - residual cube  
+`HI_image_cube*{_rep}_clean_mask.fits` - mask of only the cleaned sources.  
+`HI_image_cube*{_rep}_model.fits` - model cube (optional).    
+`HI_image_cube*{_rep}_residual.fits` - residual cube (optional).  
 
 `{rep}_clean_cat.txt` - modified version of SoFiA output catalog, appended with taskid, beam, cube numbers.  Used in `finalsources.py`.
 
