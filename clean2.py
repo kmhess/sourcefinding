@@ -75,50 +75,52 @@ def worker2(inQueue, outQueue):
 def run2(i):
     global new_cleancube_data, new_modelcube_data, new_residualcube_data
 
-    # try:
-    for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
-        imsub = lib.miriad('imsub')
-        imsub.in_ = name
-        imsub.out = name + "_" + str(chan[i]).zfill(4)
-        imsub.region = '"images({})"'.format(chan[i] + 1)
-        imsub.go()
+    try:
+        for name in ['map_{:02}'.format(minc), 'beam_{:02}'.format(minc), 'mask_{:02}'.format(minc)]:
+            imsub = lib.miriad('imsub')
+            imsub.in_ = name
+            imsub.out = name + "_" + str(chan[i]).zfill(4)
+            imsub.region = '"images({})"'.format(chan[i] + 1)
+            imsub.go()
 
-    # print("[CLEAN2] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
-    klean.map = 'map_{:02}_{:04}'.format(minc, chan[i])
-    klean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
-    klean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
-    klean.cutoff = lineimagestats[2] * 0.5
-    klean.niters = 10000
-    klean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
-    klean.go()
+        # print("[CLEAN2] Cleaning HI emission using SoFiA mask for Sources {}.".format(args.sources))
+        klean.map = 'map_{:02}_{:04}'.format(minc, chan[i])
+        klean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
+        klean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
+        klean.cutoff = lineimagestats[2] * 0.5
+        klean.niters = 10000
+        klean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
+        klean.go()
 
-    # print("[CLEAN2] Restoring line cube.")
-    restor.model = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
-    restor.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
-    restor.map = 'map_{:02}_{:04}'.format(minc, chan[i])
-    restor.out = 'image_{:02}_{:04}'.format(minc + 1, chan[i])
-    restor.mode = 'clean'
-    restor.go()
-
-    # print("[CLEAN2] Making residual cube.")
-    out_array = ['image_{:02}_{:04}'.format(minc + 1, chan[i])]
-    if args.all:
-        restor.mode = 'residual'  # Create the residual image
-        restor.out = loc + 'residual_{:02}_{:04}'.format(minc + 1, chan[i])
+        # print("[CLEAN2] Restoring line cube.")
+        restor.model = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
+        restor.map = 'map_{:02}_{:04}'.format(minc, chan[i])
+        restor.out = 'image_{:02}_{:04}'.format(minc + 1, chan[i])
+        restor.mode = 'clean'
         restor.go()
-        out_array = ['model_{:02}_{:04}'.format(minc + 1, chan[i]), 'image_{:02}_{:04}'.format(minc + 1, chan[i]),
-             'residual_{:02}_{:04}'.format(minc + 1, chan[i])]
 
-    for name in out_array:
-        fits.op = 'xyout'
-        fits.in_ = name
-        fits.out = name + '.fits'
-        fits.go()
+        # print("[CLEAN2] Making residual cube.")
+        out_array = ['image_{:02}_{:04}'.format(minc + 1, chan[i])]
+        if args.all:
+            restor.mode = 'residual'  # Create the residual image
+            restor.out = loc + 'residual_{:02}_{:04}'.format(minc + 1, chan[i])
+            restor.go()
+            out_array = ['model_{:02}_{:04}'.format(minc + 1, chan[i]), 'image_{:02}_{:04}'.format(minc + 1, chan[i]),
+                 'residual_{:02}_{:04}'.format(minc + 1, chan[i])]
 
-    new_cleancube_data[chan[i], :, :] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-    if args.all:
-        new_modelcube_data[chan[i], :, :] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-        new_residualcube_data[chan[i], :, :] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        for name in out_array:
+            fits.op = 'xyout'
+            fits.in_ = name
+            fits.out = name + '.fits'
+            fits.go()
+
+        new_cleancube_data[chan[i], :, :] = pyfits.getdata('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+        if args.all:
+            new_modelcube_data[chan[i], :, :] = pyfits.getdata('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+            new_residualcube_data[chan[i], :, :] = pyfits.getdata('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+    except RuntimeError:
+        print("Channel {} probably all blank and klean failed. Continue to next.".format(chan[i]))
 
     return 'OK'
 
@@ -197,7 +199,7 @@ catParFormt = ("%12s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
 prepare = apercal.prepare()
 
 for b in beams:
-    loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
+    loc = '/tank/hess/manga/' + taskid + '_b/B0' + str(b).zfill(2) + '/'
     print("\t{}".format(loc))
     clean_catalog = loc + 'clean_cat.txt'
 
@@ -470,19 +472,14 @@ for b in beams:
                 new_residualcube.data = new_residualcube_data
 
                 print("[CLEAN2] Updating history of reassembled model, residual, clean cubes")
-                residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
-                model_chan_hdr = pyfits.getheader('model_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
-                for hist in residual_chan_hdr[-41:]['HISTORY']:
-                    new_residualcube[0].header['HISTORY'] = hist
-                for hist in model_chan_hdr[-32:]['HISTORY']:
-                    new_modelcube[0].header['HISTORY'] = hist
-                for i in range(1, len(chan)):
-                    residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-                    model_chan_hdr = pyfits.getheader('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-                    for hist in residual_chan_hdr[-35:]['HISTORY']:
-                        new_residualcube[0].header['HISTORY'] = hist
-                    for hist in model_chan_hdr[-26:]['HISTORY']:
-                        new_modelcube[0].header['HISTORY'] = hist
+                for i in range(len(chan)):
+                    if os.path.isfile('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i])):
+                        residual_chan_hdr = pyfits.getheader('residual_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+                        model_chan_hdr = pyfits.getheader('model_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+                        for hist in residual_chan_hdr[-35:]['HISTORY']:
+                            new_residualcube[0].header['HISTORY'] = hist
+                        for hist in model_chan_hdr[-26:]['HISTORY']:
+                            new_modelcube[0].header['HISTORY'] = hist
                 new_residualcube[0].header['HISTORY'] = 'Individual images reassembled using sourcefinding/clean2.py by KMHess'
                 new_modelcube[0].header['HISTORY'] = 'Individual images reassembled using sourcefinding/clean2.py by KMHess'
 
@@ -497,19 +494,14 @@ for b in beams:
             else:
                 print("[CLEAN2] Updating history of reassembled clean cube")
 
-            clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[0]))
-            for hist in clean_chan_hdr[-41:]['HISTORY']:  # Determined through trial and error
-                new_cleancube[0].header['HISTORY'] = hist
-            bmaj_arr[0] = clean_chan_hdr['BMAJ']
-            bmin_arr[0] = clean_chan_hdr['BMIN']
-            bpa_arr[0] = clean_chan_hdr['BPA']
-            for i in range(1,len(chan)):
-                clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
-                for hist in clean_chan_hdr[-35:]['HISTORY']:  # Determined through trial and error
-                    new_cleancube[0].header['HISTORY'] = hist
-                bmaj_arr[i] = clean_chan_hdr['BMAJ']
-                bmin_arr[i] = clean_chan_hdr['BMIN']
-                bpa_arr[i] = clean_chan_hdr['BPA']
+            for i in range(len(chan)):
+                if os.path.isfile('image_{:02}_{:04}.fits'.format(minc + 1, chan[i])):
+                    clean_chan_hdr = pyfits.getheader('image_{:02}_{:04}.fits'.format(minc + 1, chan[i]))
+                    for hist in clean_chan_hdr[-35:]['HISTORY']:  # Determined through trial and error
+                        new_cleancube[0].header['HISTORY'] = hist
+                    bmaj_arr[i] = clean_chan_hdr['BMAJ']
+                    bmin_arr[i] = clean_chan_hdr['BMIN']
+                    bpa_arr[i] = clean_chan_hdr['BPA']
             new_cleancube[0].header['HISTORY'] = 'Individual images reassembled using sourcefinding/clean2.py by KMHess'
 
             print("[CLEAN2] Adding median beam properties to primary header")
