@@ -88,6 +88,7 @@ def run2(i):
     klean.beam = 'beam_{:02}_{:04}'.format(minc, chan[i])
     klean.out = 'model_{:02}_{:04}'.format(minc + 1, chan[i])
     klean.cutoff = lineimagestats[2] * 0.5
+    klean.niters = 10000
     klean.region = '"mask(mask_{:02}_{:04}/)"'.format(minc, chan[i])
     klean.go()
 
@@ -155,7 +156,7 @@ parser.add_argument('-j', "--njobs",
                     default=18)
 
 parser.add_argument('-a', "--all",
-                    help="Write residuall and model cubes as well as the cleaned cubes.",
+                    help="Write residual and model cubes as well as the cleaned cubes.",
                     action='store_true')
 
 # Parse the arguments above
