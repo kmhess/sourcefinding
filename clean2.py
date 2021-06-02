@@ -400,7 +400,7 @@ for b in beams:
             for s in sources:
                 zmin, zmax = np.int(catalog[catalog['id'] == np.int(s)]['z_min']), \
                              np.int(catalog[catalog['id'] == np.int(s)]['z_max'])
-                chan = chan + [c for c in range(zmin, zmax+1, 1)]
+                chan = chan + [ch for ch in range(zmin, zmax+1, 1)]
             chan = set(chan)
             chan = list(chan)
             bmaj_arr = np.zeros(len(chan))
