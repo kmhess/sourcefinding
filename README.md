@@ -89,3 +89,9 @@ Output:
 `final_cat.txt` - Source catalog with physically derived source properties
 
 \*\*ALL OUTPUT HAS SAME NAME REGARDLESS OF INPUT. UP TO USER TO KEEP TRACK OF WHETHER SPLINE FITTING HAS BEEN DONE OR NOT.\*\*
+
+Example output images:
+
+<img src="https://user-images.githubusercontent.com/14857798/121687545-c4d9b400-cac2-11eb-80c2-a7f0ee230cdb.png" height="240"> <img src="https://user-images.githubusercontent.com/14857798/121687564-cacf9500-cac2-11eb-9104-7fe3e273dbd4.png" height="240"> <img src="https://user-images.githubusercontent.com/14857798/121687627-db800b00-cac2-11eb-9a7d-9fc559801cfe.png" height="240">
+<img src="https://user-images.githubusercontent.com/14857798/121687587-d1f6a300-cac2-11eb-8ed3-ca67894dbde1.png" height="240"> <img src="https://user-images.githubusercontent.com/14857798/121687603-d6bb5700-cac2-11eb-8be7-cf14f3d41a4b.png" height="240"> <img src="https://user-images.githubusercontent.com/14857798/121687640-df139200-cac2-11eb-976c-f00517055ef7.png" height="240">
+<img src="https://user-images.githubusercontent.com/14857798/121687661-e2a71900-cac2-11eb-8ef0-c6cc670c608d.png" height="240">
