@@ -37,7 +37,7 @@
 # Global settings
 
 pipeline.verbose           =  false
-pipeline.pedantic          =  false
+pipeline.pedantic          =  true     # Keep this true!  Detects new *big* features in SoFiA
 pipeline.threads           =  24
 
 
@@ -59,7 +59,6 @@ flag.catalog               =
 flag.radius                =  0
 flag.auto                  =  false
 flag.threshold             =  5.0
-flag.radiusSpatial         =  0
 flag.log                   =  false
 
 
@@ -86,12 +85,15 @@ scaleNoise.interpolate     =  false
 scaleNoise.scfind          =  true
 
 
-# Spatial filter
+# Ripple filter
 
-spatFilter.enable          =  false
-spatFilter.window          =  50
-spatFilter.statistic       =  median
-spatFilter.boxcar          =  0
+rippleFilter.enable        =  false
+rippleFilter.statistic     =  median
+rippleFilter.windowXY      =  31
+rippleFilter.windowZ       =  15
+rippleFilter.gridXY        =  0
+rippleFilter.gridZ         =  0
+rippleFilter.interpolate   =  false
 
 
 # S+C finder
@@ -116,12 +118,18 @@ threshold.fluxRange        =  negative
 
 # Linker
 
+linker.enable              =  true
 linker.radiusXY            =  2
 linker.radiusZ             =  3
 linker.minSizeXY           =  5
 linker.minSizeZ            =  5
 linker.maxSizeXY           =  200
 linker.maxSizeZ            =  140
+#linker.minPixels           =  0
+#linker.maxPixels           =  0
+#linker.minFill             =  0.0
+#linker.maxFill             =  0.0
+linker.positivity          =  false
 linker.keepNegative        =  false
 
 
@@ -130,8 +138,10 @@ linker.keepNegative        =  false
 reliability.enable         =  true
 reliability.threshold      =  0.95
 reliability.scaleKernel    =  0.5
-reliability.fmin           =  16.0
+reliability.minSNR         =  12.0
+reliability.catalog        =
 reliability.plot           =  true
+reliability.debug          =  false
 
 
 # Mask dilation
@@ -166,6 +176,7 @@ output.writeRawMask        =  false
 output.writeMoments        =  false
 output.writeCubelets       =  false
 output.marginCubelets      =  0
+output.thresholdMom12      =  0.0
 output.overwrite           =  true
 
 
