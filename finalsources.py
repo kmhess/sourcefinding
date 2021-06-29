@@ -6,6 +6,7 @@ import sys
 # importing here prevents error messages from apercal
 from modules.functions import *
 from modules.get_panstarrs import *
+from modules.pbcor import pbcor
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.coordinates import SkyCoord

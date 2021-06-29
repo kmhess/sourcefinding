@@ -4,42 +4,11 @@ from astropy.time import Time
 import astropy.units as u
 import numpy as np
 
-from .PB_correction_happili2 import *
-
 
 # ----------------------------------------------
 def chan2freq(channels=None, hdu=None):
     frequencies = (channels * hdu[0].header['CDELT3'] + hdu[0].header['CRVAL3']) * u.Hz
     return frequencies
-
-
-# ----------------------------------------------
-def pbcor(taskid, image_name, hdu_image, beam, cube):
-    """
-    Find and regrid the model beam to match the image.
-    Apply primary beam correction.
-    :param image_name:
-    :param hdu_image:
-    :param beam:
-    :param cube:
-    :param chan_range:
-    :return:
-    """
-
-    # Make regridded CB FITS file if it doesn't already exist:
-    if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])) | \
-           os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
-        regrid_in_miriad(taskid, image_name, hdu_image, beam, cube)
-
-    # Make cbcor'ed FITS file if it doesn't already exist:
-    if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
-        hdu_cb = pyfits.open('{}_cb.fits'.format(image_name[:-5]))
-        apply_pb(hdu_image, hdu_cb, image_name)
-        hdu_cb.close()
-    else:
-        print("\tCompound beam corrected image exists.  Load existing image.")
-
-    return
 
 
 # ----------------------------------------------

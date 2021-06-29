@@ -9,6 +9,8 @@
 # 2, regrid beam image to the same size as the HI cube in RA and DEC (using miriad for this)
 # 3, make a frequency axes for the beam map, devide the Image cube with the beam cube (PB correction) 
 
+# Script formerly known as PB_correction_happili2.py
+
 import os
 
 from astropy.io import fits as pyfits
@@ -17,6 +19,35 @@ import numpy as np
 from apercal.libs import lib
 
 from modules import beam_lookup
+
+
+# ----------------------------------------------
+def pbcor(taskid, image_name, hdu_image, beam, cube):
+	"""
+	Find and regrid the model beam to match the image.
+	Apply primary beam correction.
+	:param image_name:
+	:param hdu_image:
+	:param beam:
+	:param cube:
+	:param chan_range:
+	:return:
+	"""
+
+	# Make regridded CB FITS file if it doesn't already exist:
+	if not os.path.isfile('{}_cb.fits'.format(image_name[:-5])) | \
+		   os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
+		regrid_in_miriad(taskid, image_name, hdu_image, beam, cube)
+
+	# Make cbcor'ed FITS file if it doesn't already exist:
+	if not os.path.isfile('{}_cbcor.fits'.format(image_name[:-5])):
+		hdu_cb = pyfits.open('{}_cb.fits'.format(image_name[:-5]))
+		apply_pb(hdu_image, hdu_cb, image_name)
+		hdu_cb.close()
+	else:
+		print("\tCompound beam corrected image exists.  Load existing image.")
+
+	return
 
 
 # ------------------------------------------------
@@ -52,7 +83,7 @@ def regrid_in_miriad(taskid, image_name, hdu_image, b, c):
 	hdulist_cb.close()
 
 	print('\tRegridding in miriad using model {}'.format(cb_model))
-	
+
 	fits = lib.miriad('fits')
 	regrid = lib.miriad('regrid')
 
