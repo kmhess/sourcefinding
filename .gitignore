@@ -14,3 +14,7 @@ old/
 # Data folders
 19*/
 20*/
+21*/
+
+# Private files for creating directory structure
+iget_script.py
