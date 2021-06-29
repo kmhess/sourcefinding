@@ -115,6 +115,7 @@ catParFormt = ("%18s", "%7i", "%10.3f", "%10.3f", "%10.3f", "%7i", "%7i", "%7i",
 for b in beams:
     loc = '/tank/hess/apertif/' + taskid + '/B0' + str(b).zfill(2) + '/'
     if os.path.isfile(loc + '{}_cat.txt'.format(clean_name)):
+        print("\t{}".format(loc))
         # Read in the master catalog of cleaned sources
         catalog = ascii.read(loc + '{}_cat.txt'.format(clean_name), header_start=1)
 
@@ -348,7 +349,7 @@ for b in beams:
                             hdulist_mask2d = fits.PrimaryHDU(mask2d, hdulist_hi[0].header)
                             mask2d_reprojected, footprint = reproject_interp(hdulist_mask2d, h2)
                             significance = hi_reprojected/(rms * np.sqrt(mask2d_reprojected))
-                            sensitivity = np.percentile(hi_reprojected[(significance>=2)*(significance<=3)], 20)
+                            sensitivity = np.nanpercentile(hi_reprojected[(significance>=2)*(significance<=3)], 20)
                             nhi19_old = 2.33e20 * rms / (bmajor.value * bminor.value) / 1e19 # 1 sigma
                             nhi19 = 2.33e20 * sensitivity / (bmajor.value * bminor.value) / 1e19
                             print("\t1sig N_HI is {}e+19. Lowest contour is {}e+19.".format(nhi19_old,nhi19))
