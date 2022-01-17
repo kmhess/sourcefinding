@@ -125,10 +125,10 @@ linker.minSizeXY           =  5
 linker.minSizeZ            =  5
 linker.maxSizeXY           =  200
 linker.maxSizeZ            =  140
-#linker.minPixels           =  0
-#linker.maxPixels           =  0
-#linker.minFill             =  0.0
-#linker.maxFill             =  0.0
+linker.minPixels           =  0
+linker.maxPixels           =  0
+linker.minFill             =  0.0
+linker.maxFill             =  0.0
 linker.positivity          =  false
 linker.keepNegative        =  false
 
@@ -136,9 +136,11 @@ linker.keepNegative        =  false
 # Reliability
 
 reliability.enable         =  true
+reliability.parameters     =  peak, sum, mean
 reliability.threshold      =  0.95
 reliability.scaleKernel    =  0.5
 reliability.minSNR         =  12.0
+reliability.minPixels      =  0
 reliability.catalog        =
 reliability.plot           =  true
 reliability.debug          =  false

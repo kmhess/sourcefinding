@@ -86,12 +86,15 @@ scaleNoise.interpolate     =  false
 scaleNoise.scfind          =  true
 
 
-# Spatial filter
+# Ripple filter
 
-spatFilter.enable          =  false
-spatFilter.window          =  50
-spatFilter.statistic       =  median
-spatFilter.boxcar          =  0
+rippleFilter.enable        =  false
+rippleFilter.statistic     =  median
+rippleFilter.windowXY      =  31
+rippleFilter.windowZ       =  15
+rippleFilter.gridXY        =  0
+rippleFilter.gridZ         =  0
+rippleFilter.interpolate   =  false
 
 
 # S+C finder
@@ -116,22 +119,32 @@ threshold.fluxRange        =  negative
 
 # Linker
 
+linker.enable              =  false
 linker.radiusXY            =  1
 linker.radiusZ             =  2
 linker.minSizeXY           =  5
 linker.minSizeZ            =  5
 linker.maxSizeXY           =  0
 linker.maxSizeZ            =  0
+linker.minPixels           =  0
+linker.maxPixels           =  0
+linker.minFill             =  0.0
+linker.maxFill             =  0.0
+linker.positivity          =  false
 linker.keepNegative        =  false
 
 
 # Reliability
 
 reliability.enable         =  false
+reliability.parameters     =  peak, sum, mean
 reliability.threshold      =  0.9
 reliability.scaleKernel    =  0.5
-reliability.fmin           =  20.0
+reliability.minSNR         =  3.0
+reliability.minPixels      =  0
+reliability.catalog        =
 reliability.plot           =  true
+reliability.debug          =  false
 
 
 # Mask dilation
@@ -155,8 +168,8 @@ parameter.offset           =  false
 
 output.directory           =  
 output.filename            =  
-output.writeCatASCII       =  true
-output.writeCatXML         =  true
+output.writeCatASCII       =  false
+output.writeCatXML         =  false
 output.writeCatSQL         =  false
 output.writeNoise          =  true
 output.writeFiltered       =  true
@@ -165,7 +178,8 @@ output.writeMask2d         =  true
 output.writeRawMask        =  false
 output.writeMoments        =  true
 output.writeCubelets       =  false
-output.marginCubelets      =  0
+output.marginCubelets      =  10
+output.thresholdMom12      =  0.0
 output.overwrite           =  true
 
 
