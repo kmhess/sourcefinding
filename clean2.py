@@ -235,10 +235,10 @@ for b in beams:
                 print("[CLEAN2] Creating a 'repaired' spline cube for Beam {:02}, Cube {}.".format(b, c))
                 os.system('cp {} {}'.format(splinefits, new_splinefits))  #speed things up by just writing later rather than copying?
                 print("\t{}".format(new_splinefits))
-                new_splinecube = pyfits.open(new_splinefits, mode='update', memmap=False)
+                new_splinecube = pyfits.open(new_splinefits, mode='update')
                 # maskcube = pyfits.open(maskfits)  # For multiple source along line of sight...need to develop!
                 mask2d = pyfits.getdata(mask2dfits)
-                orig = pyfits.open(line_cube, memmap=False)
+                orig = pyfits.open(line_cube)
                 orig_data = orig[0].data
                 new_splinecube_data = new_splinecube[0].data
                 filtered_pixels = np.copy(new_splinecube[0].data[0, :, :])

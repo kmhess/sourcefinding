@@ -146,8 +146,8 @@ for b in beams:
         elif os.path.isfile(filteredfits) & (not args.nospline):
             print(" - Loading the input cube")
             os.system('cp {} {}'.format(filteredfits, splinefits))
-            splinecube = fits.open(splinefits, mode='update', memmap=False)
-            orig = fits.open(filteredfits, memap=False)
+            splinecube = fits.open(splinefits, mode='update')
+            orig = fits.open(filteredfits)
             orig_data = orig[0].data
             splinecube_data = splinecube[0].data
 
