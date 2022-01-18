@@ -3,6 +3,7 @@ import logging
 import os
 
 from modules.natural_cubic_spline import fspline
+from src import trim_beam
 
 from argparse import ArgumentParser, RawTextHelpFormatter
 from astropy.io import ascii
@@ -207,7 +208,7 @@ for b in beams:
 
     for c in cubes:
         line_cube = cube_name + '{0}.fits'.format(c)
-        beam_cube = beam_name + '{0}.fits'.format(c)
+        beam_cube = beam_name + '{0}_full.fits'.format(c)  # Update to the expanded beam from
         maskfits = cube_name + '{0}_4sig_mask.fits'.format(c)
         mask2dfits = cube_name + '{0}_4sig_mask-2d.fits'.format(c)
         filteredfits = cube_name + '{0}_filtered.fits'.format(c)
@@ -346,8 +347,12 @@ for b in beams:
             fits.go()
 
             if not os.path.isfile(beam_cube):
-                print("[CLEAN2] Retrieving synthesized beam cube from ALTA.")
-                os.system('iget {}{}_AP_B0{:02}/HI_beam_cube{}.fits {}'.format(alta_dir, taskid, b, c, loc))
+                beam_half = loc + 'HI_beam_cube{}.fits'.format (c)
+                if not os.path.isfile(beam_half):
+                    print("[CLEAN2] Retrieving synthesized beam cube from ALTA.")
+                    os.system('iget {}{}_AP_B0{:02}/HI_beam_cube{}.fits {}'.format(alta_dir, taskid, b, c, loc))
+                print("[CLEAN2] Expanding synthesized beam.")
+                trim_beam.main(beam_half, beam_cube, 1)
             fits.in_ = beam_cube
             fits.out = 'beam_00'
             fits.go()
