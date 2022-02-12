@@ -217,7 +217,7 @@ for b in beams:
         catalog_file = cube_name + '{0}_4sig_cat.txt'.format(c)
 
         if os.path.isfile(maskfits):
-            catalog = ascii.read(catalog_file, header_start=10)
+            catalog = ascii.read(catalog_file, header_start=18)
             if args.sources == 'all':
                 mask_expr = '"(<mask_sofia>.eq.-1).or.(<mask_sofia>.ge.1)"'
                 sources = [str(s + 1) for s in range(len(catalog))]
@@ -540,7 +540,7 @@ for b in beams:
                 fits.out = outcube + '_clean_mask.fits'
                 fits.go()
 
-            catalog = ascii.read(catalog_file, header_start=10)
+            catalog = ascii.read(catalog_file, header_start=18)
             catalog['taskid'] = np.int(taskid.replace('/', ''))
             catalog['beam'] = b
             catalog['cube'] = c
